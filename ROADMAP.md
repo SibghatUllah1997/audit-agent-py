@@ -1,0 +1,33 @@
+# Roadmap (30 tiny daily steps)
+
+- Day 1: Minimal CLI + 2 rules (tx.origin, unchecked call)
+- Day 2: Add rule for `delegatecall` usage with comments
+- Day 3: Add rule for `selfdestruct`/`suicide`
+- Day 4: Support JSON output format
+- Day 5: Add file-level ignores via `// sibaudit:ignore-next-line`
+- Day 6: Add severity levels and codes documentation
+- Day 7: Add rule for state variable shadowing
+- Day 8: Add rule for `block.timestamp` time manipulation checks
+- Day 9: Add rule for numeric underflow/overflow patterns (pre-0.8)
+- Day 10: Add rule for reentrancy-prone external calls (heuristic)
+- Day 11: Add rule for missing access control on sensitive funcs
+- Day 12: Add rule for `tx.gasprice` reliance
+- Day 13: Add rule for `assert` misuse (business logic)
+- Day 14: Add rule for events missing critical parameters
+- Day 15: Add rule for `blockhash` misuse
+- Day 16: Configurable include/exclude globs
+- Day 17: Baseline suppression file
+- Day 18: Rich summary report with counts per rule
+- Day 19: VS Code task snippet examples
+- Day 20: Add `pre-commit` sample config
+- Day 21: Add GitHub Action to annotate findings
+- Day 22: Add rule for dangerous `tx.origin` comparisons depth
+- Day 23: Add rule for uninitialized `address` variables
+- Day 24: Add rule for missing zero-address checks
+- Day 25: Add rule for magic numbers without constants
+- Day 26: Add rule for external calls in constructors
+- Day 27: Add rule for payable functions w/o withdraw paths
+- Day 28: Add rule for incorrect `onlyOwner` patterns
+- Day 29: Add doc examples for each rule with rationale
+- Day 30: Optional LLM-assisted suggestions (offline/local first)
+
