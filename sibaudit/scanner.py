@@ -10,6 +10,7 @@ LOW_LEVEL_CALL_PATTERN = re.compile(
     r"\.(?:call|delegatecall|staticcall|callcode)\s*\(",
     flags=re.IGNORECASE,
 )
+DELEGATECALL_PATTERN = re.compile(r"\.delegatecall\s*\(", flags=re.IGNORECASE)
 BOOL_ASSIGN_PATTERN = re.compile(
     # Matches: (bool success, ... ) = something.call(...)
     r"\(\s*bool\s+(?P<var>[A-Za-z_]\w*)\b[\s\S]*?\)\s*=.*?\.(?:call|delegatecall|staticcall|callcode)\s*\(",
@@ -97,6 +98,19 @@ def _detect_unchecked_low_level_call(lines: list[str], file_path: Path) -> Itera
             line_text=line.rstrip(),
         )
 
+def _detect_delegatecall_usage(lines: list[str], file_path: Path) -> Iterable[Finding]:
+    # Flag any usage of delegatecall regardless of success checks.
+    # delegatecall executes code in the caller's context and is often dangerous
+    # unless used in a well-reviewed proxy pattern.
+    for idx, line in enumerate(lines, start=1):
+        if DELEGATECALL_PATTERN.search(line):
+            yield Finding(
+                file_path=file_path,
+                line_number=idx,
+                code="A003",
+                message="Use of delegatecall detected; review proxy pattern and calldata handling.",
+                line_text=line.rstrip(),
+            )
 
 def scan_paths(paths: Iterable[str]) -> list[Finding]:
     root_paths = [Path(p).resolve() for p in paths]
@@ -110,5 +124,6 @@ def scan_paths(paths: Iterable[str]) -> list[Finding]:
         lines = content.splitlines()
         findings.extend(_detect_tx_origin(lines, file_path))
         findings.extend(_detect_unchecked_low_level_call(lines, file_path))
+        findings.extend(_detect_delegatecall_usage(lines, file_path))
     return findings
 
