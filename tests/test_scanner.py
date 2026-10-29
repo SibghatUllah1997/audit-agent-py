@@ -76,3 +76,20 @@ def test_flags_delegatecall_usage_even_if_checked(tmp_path: Path) -> None:
     # And A002 should not be reported because it's checked
     assert not any(f.code == "A002" for f in findings)
 
+def test_detects_selfdestruct_and_suicide(tmp_path: Path) -> None:
+    code = """
+    // SPDX-License-Identifier: MIT
+    pragma solidity ^0.8.20;
+    contract E {
+        function k(address payable a) external {
+            selfdestruct(a);
+        }
+        function l(address payable b) external {
+            suicide(b); // legacy name
+        }
+    }
+    """.strip()
+    file_path = write(tmp_path, "E.sol", code)
+    findings = scan_paths([str(tmp_path)])
+    assert sum(1 for f in findings if f.code == "A004" and f.file_path == file_path) == 2
+

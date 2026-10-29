@@ -16,6 +16,10 @@ BOOL_ASSIGN_PATTERN = re.compile(
     r"\(\s*bool\s+(?P<var>[A-Za-z_]\w*)\b[\s\S]*?\)\s*=.*?\.(?:call|delegatecall|staticcall|callcode)\s*\(",
     flags=re.IGNORECASE,
 )
+SELFDESTRUCT_OR_SUICIDE_PATTERN = re.compile(
+    r"\b(?:selfdestruct|suicide)\s*\(",
+    flags=re.IGNORECASE,
+)
 
 REQUIRE_VAR_PATTERN_FMT = r"require\s*\(\s*{var}\s*(?:[,)])"
 ASSERT_VAR_PATTERN_FMT = r"assert\s*\(\s*{var}\s*\)"
@@ -112,6 +116,17 @@ def _detect_delegatecall_usage(lines: list[str], file_path: Path) -> Iterable[Fi
                 line_text=line.rstrip(),
             )
 
+def _detect_selfdestruct_or_suicide(lines: list[str], file_path: Path) -> Iterable[Finding]:
+    for idx, line in enumerate(lines, start=1):
+        if SELFDESTRUCT_OR_SUICIDE_PATTERN.search(line):
+            keyword = "selfdestruct" if "selfdestruct" in line.lower() else "suicide"
+            yield Finding(
+                file_path=file_path,
+                line_number=idx,
+                code="A004",
+                message=f"Use of {keyword} detected; can brick contracts and break integrations.",
+                line_text=line.rstrip(),
+            )
 def scan_paths(paths: Iterable[str]) -> list[Finding]:
     root_paths = [Path(p).resolve() for p in paths]
     findings: list[Finding] = []
@@ -125,5 +140,6 @@ def scan_paths(paths: Iterable[str]) -> list[Finding]:
         findings.extend(_detect_tx_origin(lines, file_path))
         findings.extend(_detect_unchecked_low_level_call(lines, file_path))
         findings.extend(_detect_delegatecall_usage(lines, file_path))
+        findings.extend(_detect_selfdestruct_or_suicide(lines, file_path))
     return findings
 
