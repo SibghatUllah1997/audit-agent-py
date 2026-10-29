@@ -5,7 +5,7 @@ A tiny, educational Python CLI that scans Solidity (`.sol`) files for a couple o
 - Use of `tx.origin` (often misused for authentication)
 - Unchecked low-level calls (e.g., `address.call(...)`) where the success value is not obviously verified
 
-This is an intentionally minimal, static checker to bootstrap a daily portfolio project. Future days may add more rules and (optionally) an ic/LLM layer — but this Day 1 is pure, simple Python.
+This is an intentionally minimal, static checker to bootstrap a daily portfolio project. Future days may add more rules — but this Day 1 is pure, simple Python.
 
 ## Quickstart
 
@@ -25,6 +25,13 @@ python -m sibaudit path/to/contracts
 ```
 
 Findings are printed in `path:line: CODE message` format. The CLI exits with code 1 if any findings are detected, otherwise 0.
+
+## Current rules
+
+- A001: Potential risky use of `tx.origin`
+- A002: Low-level call without capturing/validating success (heuristic)
+- A003: Use of `delegatecall` detected (dangerous; review proxy usage carefully)
+- A004: Use of `selfdestruct`/`suicide` detected (can brick contracts)
 
 ## What this is (and isn’t)
 
