@@ -18,15 +18,33 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         default=["."],
         help="Files or directories to scan (default: current directory).",
     )
+    parser.add_argument(
+        "--format",
+        choices=["text", "json"],
+        default="text",
+        help="Output format: 'text' (default) or 'json' (newline-delimited JSON objects).",
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> None:
     ns = parse_args(sys.argv[1:] if argv is None else argv)
     findings = scan_paths(ns.paths)
-    for f in findings:
-        rel = str(Path(f.file_path))
-        print(f"{rel}:{f.line_number}: {f.code} {f.message}")
+    if ns.format == "json":
+        import json
+
+        for f in findings:
+            record = {
+                "file_path": str(Path(f.file_path)),
+                "line_number": f.line_number,
+                "code": f.code,
+                "message": f.message,
+            }
+            print(json.dumps(record, ensure_ascii=False))
+    else:
+        for f in findings:
+            rel = str(Path(f.file_path))
+            print(f"{rel}:{f.line_number}: {f.code} {f.message}")
     # Exit non-zero if any findings
     sys.exit(1 if findings else 0)
 
