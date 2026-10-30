@@ -45,8 +45,12 @@ def _iter_solidity_files(paths: Iterable[Path]) -> Iterable[Path]:
                     yield sub
 
 
-def _detect_tx_origin(lines: list[str], file_path: Path) -> Iterable[Finding]:
+def _detect_tx_origin(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterable[Finding]:
     for idx, line in enumerate(lines, start=1):
+        if ignore_next_lines and idx in ignore_next_lines:
+            continue
         if TX_ORIGIN_PATTERN.search(line):
             yield Finding(
                 file_path=file_path,
@@ -57,7 +61,9 @@ def _detect_tx_origin(lines: list[str], file_path: Path) -> Iterable[Finding]:
             )
 
 
-def _detect_unchecked_low_level_call(lines: list[str], file_path: Path) -> Iterable[Finding]:
+def _detect_unchecked_low_level_call(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterable[Finding]:
     # Simple heuristic:
     # 1) If a low-level call appears without assigning (bool var, ...) = ...call(...):
     #    flag it
@@ -65,6 +71,8 @@ def _detect_unchecked_low_level_call(lines: list[str], file_path: Path) -> Itera
     #    require(var), assert(var), or if(!var) { revert/... }
     window = 3  # lines to look ahead for checks
     for idx, line in enumerate(lines, start=1):
+        if ignore_next_lines and idx in ignore_next_lines:
+            continue
         call_match = LOW_LEVEL_CALL_PATTERN.search(line)
         if not call_match:
             continue
@@ -102,11 +110,15 @@ def _detect_unchecked_low_level_call(lines: list[str], file_path: Path) -> Itera
             line_text=line.rstrip(),
         )
 
-def _detect_delegatecall_usage(lines: list[str], file_path: Path) -> Iterable[Finding]:
+def _detect_delegatecall_usage(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterable[Finding]:
     # Flag any usage of delegatecall regardless of success checks.
     # delegatecall executes code in the caller's context and is often dangerous
     # unless used in a well-reviewed proxy pattern.
     for idx, line in enumerate(lines, start=1):
+        if ignore_next_lines and idx in ignore_next_lines:
+            continue
         if DELEGATECALL_PATTERN.search(line):
             yield Finding(
                 file_path=file_path,
@@ -116,8 +128,12 @@ def _detect_delegatecall_usage(lines: list[str], file_path: Path) -> Iterable[Fi
                 line_text=line.rstrip(),
             )
 
-def _detect_selfdestruct_or_suicide(lines: list[str], file_path: Path) -> Iterable[Finding]:
+def _detect_selfdestruct_or_suicide(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterable[Finding]:
     for idx, line in enumerate(lines, start=1):
+        if ignore_next_lines and idx in ignore_next_lines:
+            continue
         if SELFDESTRUCT_OR_SUICIDE_PATTERN.search(line):
             keyword = "selfdestruct" if "selfdestruct" in line.lower() else "suicide"
             yield Finding(
@@ -137,9 +153,15 @@ def scan_paths(paths: Iterable[str]) -> list[Finding]:
             # Skip unreadable files
             continue
         lines = content.splitlines()
-        findings.extend(_detect_tx_origin(lines, file_path))
-        findings.extend(_detect_unchecked_low_level_call(lines, file_path))
-        findings.extend(_detect_delegatecall_usage(lines, file_path))
-        findings.extend(_detect_selfdestruct_or_suicide(lines, file_path))
+        # Build ignore set: for any line containing the directive, ignore the next line index.
+        ignore_next_lines: set[int] = set()
+        for idx, line in enumerate(lines, start=1):
+            if "sibaudit:ignore-next-line" in line:
+                ignore_next_lines.add(idx + 1)
+
+        findings.extend(_detect_tx_origin(lines, file_path, ignore_next_lines))
+        findings.extend(_detect_unchecked_low_level_call(lines, file_path, ignore_next_lines))
+        findings.extend(_detect_delegatecall_usage(lines, file_path, ignore_next_lines))
+        findings.extend(_detect_selfdestruct_or_suicide(lines, file_path, ignore_next_lines))
     return findings
 

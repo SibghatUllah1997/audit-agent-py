@@ -41,6 +41,15 @@ Each line is a JSON object with:
 - `code` (string, e.g. `A001`)
 - `message` (string)
 
+### Ignoring one line
+
+Add the following directive on a line to ignore the very next line (for all rules):
+
+```solidity
+// sibaudit:ignore-next-line
+address a = tx.origin; // this line will be ignored
+```
+
 ## Current rules
 
 - A001: Potential risky use of `tx.origin`
