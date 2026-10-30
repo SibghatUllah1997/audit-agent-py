@@ -3,7 +3,7 @@
 - Day 1: Minimal CLI + 2 rules (tx.origin, unchecked call)
 - [x] Day 2: Add rule for `delegatecall` usage with comments
 - [x] Day 3: Add rule for `selfdestruct`/`suicide`
-- Day 4: Support JSON output format
+- [x] Day 4: Support JSON output format
 - Day 5: Add file-level ignores via `// sibaudit:ignore-next-line`
 - Day 6: Add severity levels and codes documentation
 - Day 7: Add rule for state variable shadowing

@@ -26,6 +26,21 @@ python -m sibaudit path/to/contracts
 
 Findings are printed in `path:line: CODE message` format. The CLI exits with code 1 if any findings are detected, otherwise 0.
 
+### JSON output
+
+You can emit newline-delimited JSON records instead of text:
+
+```bash
+python -m sibaudit --format json path/to/contracts > findings.ndjson
+```
+
+Each line is a JSON object with:
+
+- `file_path` (string)
+- `line_number` (int)
+- `code` (string, e.g. `A001`)
+- `message` (string)
+
 ## Current rules
 
 - A001: Potential risky use of `tx.origin`
