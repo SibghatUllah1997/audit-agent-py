@@ -4,7 +4,7 @@
 - [x] Day 2: Add rule for `delegatecall` usage with comments
 - [x] Day 3: Add rule for `selfdestruct`/`suicide`
 - [x] Day 4: Support JSON output format
-- Day 5: Add file-level ignores via `// sibaudit:ignore-next-line`
+- [x] Day 5: Add file-level ignores via `// sibaudit:ignore-next-line`
 - Day 6: Add severity levels and codes documentation
 - Day 7: Add rule for state variable shadowing
 - Day 8: Add rule for `block.timestamp` time manipulation checks

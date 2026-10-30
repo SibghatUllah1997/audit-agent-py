@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-30
+- Added `--format json` to emit newline-delimited JSON findings.
+- Introduced `// sibaudit:ignore-next-line` directive to skip the next line for all rules.
+
 ## 2026-10-29
 - Added rule A003 to flag any `delegatecall` usage and accompanying tests.
 - Added rule A004 to detect `selfdestruct`/`suicide` usage.
