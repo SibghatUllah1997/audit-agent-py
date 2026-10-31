@@ -58,6 +58,7 @@ def test_ignores_checked_call_with_require(tmp_path: Path) -> None:
     # Should not raise A002 for the checked call
     assert not any(f.code == "A002" for f in findings)
 
+
 def test_flags_delegatecall_usage_even_if_checked(tmp_path: Path) -> None:
     code = """
     // SPDX-License-Identifier: MIT
@@ -75,6 +76,7 @@ def test_flags_delegatecall_usage_even_if_checked(tmp_path: Path) -> None:
     assert any(f.code == "A003" and f.file_path == file_path for f in findings)
     # And A002 should not be reported because it's checked
     assert not any(f.code == "A002" for f in findings)
+
 
 def test_detects_selfdestruct_and_suicide(tmp_path: Path) -> None:
     code = """

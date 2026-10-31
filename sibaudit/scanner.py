@@ -1,25 +1,22 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
+# Basic risky patterns
 TX_ORIGIN_PATTERN = re.compile(r"\btx\.origin\b")
 LOW_LEVEL_CALL_PATTERN = re.compile(
-    r"\.(?:call|delegatecall|staticcall|callcode)\s*\(",
-    flags=re.IGNORECASE,
+    r"\.(?:call|delegatecall|staticcall|callcode)\s*\(", re.IGNORECASE
 )
-DELEGATECALL_PATTERN = re.compile(r"\.delegatecall\s*\(", flags=re.IGNORECASE)
+DELEGATECALL_PATTERN = re.compile(r"\.delegatecall\s*\(", re.IGNORECASE)
 BOOL_ASSIGN_PATTERN = re.compile(
     # Matches: (bool success, ... ) = something.call(...)
     r"\(\s*bool\s+(?P<var>[A-Za-z_]\w*)\b[\s\S]*?\)\s*=.*?\.(?:call|delegatecall|staticcall|callcode)\s*\(",
-    flags=re.IGNORECASE,
+    re.IGNORECASE,
 )
-SELFDESTRUCT_OR_SUICIDE_PATTERN = re.compile(
-    r"\b(?:selfdestruct|suicide)\s*\(",
-    flags=re.IGNORECASE,
-)
+SELFDESTRUCT_OR_SUICIDE_PATTERN = re.compile(r"\b(?:selfdestruct|suicide)\s*\(", re.IGNORECASE)
 
 REQUIRE_VAR_PATTERN_FMT = r"require\s*\(\s*{var}\s*(?:[,)])"
 ASSERT_VAR_PATTERN_FMT = r"assert\s*\(\s*{var}\s*\)"
@@ -35,7 +32,7 @@ class Finding:
     line_text: str
 
 
-def _iter_solidity_files(paths: Iterable[Path]) -> Iterable[Path]:
+def _iter_solidity_files(paths: Iterable[Path]) -> Iterator[Path]:
     for p in paths:
         if p.is_file() and p.suffix.lower() == ".sol":
             yield p
@@ -47,7 +44,7 @@ def _iter_solidity_files(paths: Iterable[Path]) -> Iterable[Path]:
 
 def _detect_tx_origin(
     lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
-) -> Iterable[Finding]:
+) -> Iterator[Finding]:
     for idx, line in enumerate(lines, start=1):
         if ignore_next_lines and idx in ignore_next_lines:
             continue
@@ -63,7 +60,7 @@ def _detect_tx_origin(
 
 def _detect_unchecked_low_level_call(
     lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
-) -> Iterable[Finding]:
+) -> Iterator[Finding]:
     # Simple heuristic:
     # 1) If a low-level call appears without assigning (bool var, ...) = ...call(...):
     #    flag it
@@ -110,9 +107,10 @@ def _detect_unchecked_low_level_call(
             line_text=line.rstrip(),
         )
 
+
 def _detect_delegatecall_usage(
     lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
-) -> Iterable[Finding]:
+) -> Iterator[Finding]:
     # Flag any usage of delegatecall regardless of success checks.
     # delegatecall executes code in the caller's context and is often dangerous
     # unless used in a well-reviewed proxy pattern.
@@ -128,9 +126,10 @@ def _detect_delegatecall_usage(
                 line_text=line.rstrip(),
             )
 
+
 def _detect_selfdestruct_or_suicide(
     lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
-) -> Iterable[Finding]:
+) -> Iterator[Finding]:
     for idx, line in enumerate(lines, start=1):
         if ignore_next_lines and idx in ignore_next_lines:
             continue
@@ -143,6 +142,8 @@ def _detect_selfdestruct_or_suicide(
                 message=f"Use of {keyword} detected; can brick contracts and break integrations.",
                 line_text=line.rstrip(),
             )
+
+
 def scan_paths(paths: Iterable[str]) -> list[Finding]:
     root_paths = [Path(p).resolve() for p in paths]
     findings: list[Finding] = []
