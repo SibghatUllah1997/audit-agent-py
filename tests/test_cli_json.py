@@ -44,6 +44,10 @@ def test_cli_json_outputs_findings_and_nonzero_exit(tmp_path: Path) -> None:
     parsed = [json.loads(ln) for ln in lines]
     codes = {p["code"] for p in parsed}
     assert {"A001", "A002"} <= codes
+    # Severities should be present and valid
+    severities = {p.get("severity") for p in parsed}
+    assert severities <= {"LOW", "MEDIUM", "HIGH"}
+    assert any(p["severity"] in {"LOW", "MEDIUM", "HIGH"} for p in parsed)
     # At least some records should reference the created file
     assert any(str(file_path) in p["file_path"] for p in parsed)
 
