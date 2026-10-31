@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-31
+- Added severity levels to findings and documented rule codes.
+- Implemented rule A005 for state variable shadowing and extended tests.
+
 ## 2026-10-30
 - Added `--format json` to emit newline-delimited JSON findings.
 - Introduced `// sibaudit:ignore-next-line` directive to skip the next line for all rules.

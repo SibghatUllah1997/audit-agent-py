@@ -5,8 +5,8 @@
 - [x] Day 3: Add rule for `selfdestruct`/`suicide`
 - [x] Day 4: Support JSON output format
 - [x] Day 5: Add file-level ignores via `// sibaudit:ignore-next-line`
-- Day 6: Add severity levels and codes documentation
-- Day 7: Add rule for state variable shadowing
+- [x] Day 6: Add severity levels and codes documentation
+- [x] Day 7: Add rule for state variable shadowing
 - Day 8: Add rule for `block.timestamp` time manipulation checks
 - Day 9: Add rule for numeric underflow/overflow patterns (pre-0.8)
 - Day 10: Add rule for reentrancy-prone external calls (heuristic)
