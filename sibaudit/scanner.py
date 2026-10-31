@@ -154,6 +154,92 @@ def _detect_selfdestruct_or_suicide(
             )
 
 
+def _detect_state_var_shadowing(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    # Heuristic: collect state variable names declared at contract scope, then
+    # flag any function parameter that reuses the same identifier.
+    severity = "LOW"
+    state_vars: set[str] = set()
+    in_contract = False
+    brace_depth = 0
+
+    # First pass: gather state variables
+    for raw in lines:
+        line = raw.strip()
+        # Track braces to approximate contract scope
+        brace_depth += raw.count("{")
+        brace_depth -= raw.count("}")
+        if line.startswith("contract "):
+            in_contract = True
+        if in_contract and ";" in raw:
+            lower = line.lower()
+            if any(
+                k in lower
+                for k in (
+                    "function ",
+                    "event ",
+                    "struct ",
+                    "enum ",
+                    "modifier ",
+                    "using ",
+                    "error ",
+                )
+            ):
+                continue
+            # Extract the last identifier token before the semicolon as the variable name
+            identifiers = re.findall(r"[A-Za-z_]\w*", raw)
+            if identifiers:
+                candidate = identifiers[-1]
+                # Basic guard: avoid common qualifiers accidentally captured
+                if candidate not in {
+                    "public",
+                    "private",
+                    "internal",
+                    "external",
+                    "constant",
+                    "immutable",
+                    "memory",
+                    "calldata",
+                    "storage",
+                    "payable",
+                    "view",
+                    "pure",
+                    "virtual",
+                    "override",
+                }:
+                    state_vars.add(candidate)
+        if in_contract and brace_depth <= 0:
+            in_contract = False
+
+    # Second pass: check function parameter lists
+    func_sig = re.compile(r"\bfunction\b[^{;]*\((?P<params>[^)]*)\)")
+    for idx, raw in enumerate(lines, start=1):
+        if ignore_next_lines and idx in ignore_next_lines:
+            continue
+        m = func_sig.search(raw)
+        if not m:
+            continue
+        params = m.group("params")
+        for part in params.split(","):
+            part = part.strip()
+            if not part:
+                continue
+            identifiers = re.findall(r"[A-Za-z_]\w*", part)
+            if not identifiers:
+                continue
+            candidate = identifiers[-1]
+            if candidate in state_vars:
+                yield Finding(
+                    file_path=file_path,
+                    line_number=idx,
+                    code="A005",
+                    severity=severity,
+                    message=f'Function parameter "{candidate}" shadows a state variable.',
+                    line_text=raw.rstrip(),
+                )
+
+
 def scan_paths(paths: Iterable[str]) -> list[Finding]:
     root_paths = [Path(p).resolve() for p in paths]
     findings: list[Finding] = []
@@ -174,5 +260,6 @@ def scan_paths(paths: Iterable[str]) -> list[Finding]:
         findings.extend(_detect_unchecked_low_level_call(lines, file_path, ignore_next_lines))
         findings.extend(_detect_delegatecall_usage(lines, file_path, ignore_next_lines))
         findings.extend(_detect_selfdestruct_or_suicide(lines, file_path, ignore_next_lines))
+        findings.extend(_detect_state_var_shadowing(lines, file_path, ignore_next_lines))
     return findings
 
