@@ -38,6 +38,7 @@ def main(argv: list[str] | None = None) -> None:
                 "file_path": str(Path(f.file_path)),
                 "line_number": f.line_number,
                 "code": f.code,
+                "severity": f.severity,
                 "message": f.message,
             }
             print(json.dumps(record, ensure_ascii=False))

@@ -28,6 +28,7 @@ class Finding:
     file_path: Path
     line_number: int
     code: str
+    severity: str
     message: str
     line_text: str
 
@@ -45,6 +46,7 @@ def _iter_solidity_files(paths: Iterable[Path]) -> Iterator[Path]:
 def _detect_tx_origin(
     lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
 ) -> Iterator[Finding]:
+    severity = "MEDIUM"
     for idx, line in enumerate(lines, start=1):
         if ignore_next_lines and idx in ignore_next_lines:
             continue
@@ -53,6 +55,7 @@ def _detect_tx_origin(
                 file_path=file_path,
                 line_number=idx,
                 code="A001",
+                severity=severity,
                 message="Potential risky use of tx.origin (often unsafe for auth).",
                 line_text=line.rstrip(),
             )
@@ -67,6 +70,7 @@ def _detect_unchecked_low_level_call(
     # 2) If assigned to (bool var, ...), ensure a nearby check exists:
     #    require(var), assert(var), or if(!var) { revert/... }
     window = 3  # lines to look ahead for checks
+    severity = "MEDIUM"
     for idx, line in enumerate(lines, start=1):
         if ignore_next_lines and idx in ignore_next_lines:
             continue
@@ -93,6 +97,7 @@ def _detect_unchecked_low_level_call(
                     file_path=file_path,
                     line_number=idx,
                     code="A002",
+                    severity=severity,
                     message="Low-level call success not obviously checked (heuristic).",
                     line_text=line.rstrip(),
                 )
@@ -103,6 +108,7 @@ def _detect_unchecked_low_level_call(
             file_path=file_path,
             line_number=idx,
             code="A002",
+            severity=severity,
             message="Low-level call without capturing/validating success (heuristic).",
             line_text=line.rstrip(),
         )
@@ -114,6 +120,7 @@ def _detect_delegatecall_usage(
     # Flag any usage of delegatecall regardless of success checks.
     # delegatecall executes code in the caller's context and is often dangerous
     # unless used in a well-reviewed proxy pattern.
+    severity = "HIGH"
     for idx, line in enumerate(lines, start=1):
         if ignore_next_lines and idx in ignore_next_lines:
             continue
@@ -122,6 +129,7 @@ def _detect_delegatecall_usage(
                 file_path=file_path,
                 line_number=idx,
                 code="A003",
+                severity=severity,
                 message="Use of delegatecall detected; review proxy pattern and calldata handling.",
                 line_text=line.rstrip(),
             )
@@ -130,6 +138,7 @@ def _detect_delegatecall_usage(
 def _detect_selfdestruct_or_suicide(
     lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
 ) -> Iterator[Finding]:
+    severity = "HIGH"
     for idx, line in enumerate(lines, start=1):
         if ignore_next_lines and idx in ignore_next_lines:
             continue
@@ -139,6 +148,7 @@ def _detect_selfdestruct_or_suicide(
                 file_path=file_path,
                 line_number=idx,
                 code="A004",
+                severity=severity,
                 message=f"Use of {keyword} detected; can brick contracts and break integrations.",
                 line_text=line.rstrip(),
             )
