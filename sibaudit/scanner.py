@@ -18,6 +18,9 @@ BOOL_ASSIGN_PATTERN = re.compile(
 )
 SELFDESTRUCT_OR_SUICIDE_PATTERN = re.compile(r"\b(?:selfdestruct|suicide)\s*\(", re.IGNORECASE)
 TIMESTAMP_PATTERN = re.compile(r"\b(?:block\.timestamp|now)\b")
+ARITH_EXPR_PATTERN = re.compile(
+    r"(?:[A-Za-z_]\w*|\d+)\s*[\+\-\*\/]\s*(?:[A-Za-z_]\w*|\d+|\()"
+)
 
 REQUIRE_VAR_PATTERN_FMT = r"require\s*\(\s*{var}\s*(?:[,)])"
 ASSERT_VAR_PATTERN_FMT = r"assert\s*\(\s*{var}\s*\)"
@@ -61,6 +64,65 @@ def _detect_tx_origin(
                 line_text=line.rstrip(),
             )
 
+def _is_pre_0_8_solidity(lines: list[str]) -> bool:
+    pragma_re = re.compile(r"^\s*pragma\s+solidity\s+([^;]+);", re.IGNORECASE)
+    for raw in lines:
+        m = pragma_re.search(raw)
+        if not m:
+            continue
+        spec = m.group(1)
+        spec_no_ws = spec.replace(" ", "")
+        if "<0.8" in spec_no_ws:
+            return True
+        mver = re.search(r"[\^~]?\s*0\.(\d+)", spec)
+        if mver:
+            try:
+                minor = int(mver.group(1))
+                if minor < 8 and "0.8" not in spec:
+                    return True
+            except ValueError:
+                pass
+        if spec_no_ws.startswith(">=") and spec_no_ws.startswith(">=0.") and "0.8" not in spec:
+            try:
+                minor = int(re.search(r">=0\.(\d+)", spec_no_ws).group(1))  # type: ignore[union-attr]
+                if minor < 8:
+                    return True
+            except Exception:
+                continue
+    return False
+
+
+def _detect_pre_08_unchecked_arithmetic(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    if not _is_pre_0_8_solidity(lines):
+        return
+    severity = "MEDIUM"
+    in_block_comment = False
+    for idx, line in enumerate(lines, start=1):
+        if ignore_next_lines and idx in ignore_next_lines:
+            continue
+        if "/*" in line:
+            in_block_comment = True
+        if in_block_comment and "*/" in line:
+            in_block_comment = False
+            continue
+        if in_block_comment:
+            continue
+        stripped = line.strip()
+        if not stripped or stripped.startswith("//") or stripped.startswith("pragma "):
+            continue
+        if "++" in line or "--" in line:
+            continue
+        if ARITH_EXPR_PATTERN.search(line):
+            yield Finding(
+                file_path=file_path,
+                line_number=idx,
+                code="A007",
+                severity=severity,
+                message="Unchecked arithmetic in pre-0.8 Solidity (overflow/underflow risk).",
+                line_text=line.rstrip(),
+            )
 
 def _detect_unchecked_low_level_call(
     lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
@@ -286,5 +348,6 @@ def scan_paths(paths: Iterable[str]) -> list[Finding]:
         findings.extend(_detect_selfdestruct_or_suicide(lines, file_path, ignore_next_lines))
         findings.extend(_detect_state_var_shadowing(lines, file_path, ignore_next_lines))
         findings.extend(_detect_block_timestamp_usage(lines, file_path, ignore_next_lines))
+        findings.extend(_detect_pre_08_unchecked_arithmetic(lines, file_path, ignore_next_lines))
     return findings
 
