@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-01
+- Added rule A006 to flag `block.timestamp`/`now` usage and corresponding tests.
+- Added rule A007 to flag unchecked arithmetic in pre-0.8 contracts with tests.
+- Updated README and marked Day 8 and Day 9 complete in ROADMAP.
+
 ## 2026-10-31
 - Added severity levels to findings and documented rule codes.
 - Implemented rule A005 for state variable shadowing and extended tests.
