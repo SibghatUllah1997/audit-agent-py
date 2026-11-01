@@ -6,6 +6,8 @@ A tiny, educational Python CLI that scans Solidity (`.sol`) files for a few well
 - Unchecked low-level calls (e.g., `address.call(...)`) where the success value is not obviously verified
 - Use of `delegatecall`
 - Use of `selfdestruct` / `suicide`
+- Use of `block.timestamp` / `now`
+- Unchecked arithmetic in pre-0.8 Solidity
 
 This is an intentionally minimal, static checker to bootstrap a daily portfolio project.
 
@@ -59,7 +61,9 @@ address a = tx.origin; // this line will be ignored
 - A002 (MEDIUM): Low-level call without capturing/validating success (heuristic)
 - A003 (HIGH): Use of `delegatecall` detected (dangerous; review proxy usage carefully)
 - A004 (HIGH): Use of `selfdestruct`/`suicide` detected (can brick contracts)
-- A005 (LOW): State variable shadowing by a parameter or local variable (heuristic) — planned
+- A005 (LOW): State variable shadowing by a parameter or local variable (heuristic)
+- A006 (MEDIUM): Use of `block.timestamp` / `now` (time can be manipulated slightly)
+- A007 (MEDIUM): Unchecked arithmetic in pre-0.8 Solidity (overflow/underflow risk)
 
 ## What this is (and isn’t)
 
