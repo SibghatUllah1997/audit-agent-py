@@ -17,6 +17,7 @@ BOOL_ASSIGN_PATTERN = re.compile(
     re.IGNORECASE,
 )
 SELFDESTRUCT_OR_SUICIDE_PATTERN = re.compile(r"\b(?:selfdestruct|suicide)\s*\(", re.IGNORECASE)
+TIMESTAMP_PATTERN = re.compile(r"\b(?:block\.timestamp|now)\b")
 
 REQUIRE_VAR_PATTERN_FMT = r"require\s*\(\s*{var}\s*(?:[,)])"
 ASSERT_VAR_PATTERN_FMT = r"assert\s*\(\s*{var}\s*\)"
@@ -239,6 +240,29 @@ def _detect_state_var_shadowing(
                     line_text=raw.rstrip(),
                 )
 
+def _detect_block_timestamp_usage(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    severity = "MEDIUM"
+    for idx, line in enumerate(lines, start=1):
+        if ignore_next_lines and idx in ignore_next_lines:
+            continue
+        stripped = line.strip()
+        if not stripped or stripped.startswith("//"):
+            continue
+        # Skip one-line block comments
+        if "/*" in line and "*/" in line:
+            continue
+        if TIMESTAMP_PATTERN.search(line):
+            yield Finding(
+                file_path=file_path,
+                line_number=idx,
+                code="A006",
+                severity=severity,
+                message="Use of block.timestamp/now detected; time can be manipulated slightly.",
+                line_text=line.rstrip(),
+            )
+
 
 def scan_paths(paths: Iterable[str]) -> list[Finding]:
     root_paths = [Path(p).resolve() for p in paths]
@@ -261,5 +285,6 @@ def scan_paths(paths: Iterable[str]) -> list[Finding]:
         findings.extend(_detect_delegatecall_usage(lines, file_path, ignore_next_lines))
         findings.extend(_detect_selfdestruct_or_suicide(lines, file_path, ignore_next_lines))
         findings.extend(_detect_state_var_shadowing(lines, file_path, ignore_next_lines))
+        findings.extend(_detect_block_timestamp_usage(lines, file_path, ignore_next_lines))
     return findings
 
