@@ -1,0 +1,55 @@
+name: "Run sibaudit and upload SARIF"
+description: "Static analysis for Solidity risky patterns with SARIF output for GitHub code scanning"
+author: "HM Sibghat Ullah"
+inputs:
+  paths:
+    description: "Space-separated list of files/directories to scan"
+    required: false
+    default: "."
+  format:
+    description: "Output format (text|json|sarif)"
+    required: false
+    default: "sarif"
+  output:
+    description: "Output file path for SARIF when format=sarif"
+    required: false
+    default: "sibaudit.sarif"
+  python-version:
+    description: "Python version to use"
+    required: false
+    default: "3.x"
+  upload:
+    description: "Upload SARIF to GitHub code scanning (when format=sarif)"
+    required: false
+    default: "true"
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install sibaudit
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        pip install .
+
+    - name: Run sibaudit
+      shell: bash
+      run: |
+        if [ "${{ inputs.format }}" = "sarif" ]; then
+          sibaudit --format sarif ${{ inputs.paths }} > "${{ inputs.output }}"
+        else
+          sibaudit --format "${{ inputs.format }}" ${{ inputs.paths }}
+        fi
+
+    - name: Upload SARIF
+      if: ${{ inputs.format == 'sarif' && inputs.upload == 'true' }}
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{ inputs.output }}
+branding:
+  icon: "shield"
+  color: "blue"
