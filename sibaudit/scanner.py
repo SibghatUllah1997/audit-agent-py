@@ -8,12 +8,12 @@ from pathlib import Path
 # Basic risky patterns
 TX_ORIGIN_PATTERN = re.compile(r"\btx\.origin\b")
 LOW_LEVEL_CALL_PATTERN = re.compile(
-    r"\.(?:call|delegatecall|staticcall|callcode)\s*\(", re.IGNORECASE
+    r"\.\s*(?:call|delegatecall|staticcall|callcode)\s*\(", re.IGNORECASE
 )
-DELEGATECALL_PATTERN = re.compile(r"\.delegatecall\s*\(", re.IGNORECASE)
+DELEGATECALL_PATTERN = re.compile(r"\.\s*delegatecall\s*\(", re.IGNORECASE)
 BOOL_ASSIGN_PATTERN = re.compile(
     # Matches: (bool success, ... ) = something.call(...)
-    r"\(\s*bool\s+(?P<var>[A-Za-z_]\w*)\b[\s\S]*?\)\s*=.*?\.(?:call|delegatecall|staticcall|callcode)\s*\(",
+    r"\(\s*bool\s+(?P<var>[A-Za-z_]\w*)\b[\s\S]*?\)\s*=.*?\.\s*(?:call|delegatecall|staticcall|callcode)\s*\(",
     re.IGNORECASE,
 )
 SELFDESTRUCT_OR_SUICIDE_PATTERN = re.compile(r"\b(?:selfdestruct|suicide)\s*\(", re.IGNORECASE)
@@ -21,6 +21,37 @@ TIMESTAMP_PATTERN = re.compile(r"\b(?:block\.timestamp|now)\b")
 ARITH_EXPR_PATTERN = re.compile(
     r"(?:[A-Za-z_]\w*|\d+)\s*[\+\-\*\/]\s*(?:[A-Za-z_]\w*|\d+|\()"
 )
+
+def _strip_block_comments(line: str, in_block_comment: bool) -> tuple[str, bool]:
+    """
+    Remove block comment segments from a line. Maintains and returns block-comment state.
+    """
+    processed = line
+    idx = 0
+    while True:
+        if in_block_comment:
+            end = processed.find("*/", idx)
+            if end == -1:
+                # Entire remainder is inside a block comment
+                return ("", True)
+            # Drop content up to and including */
+            processed = processed[end + 2 :]
+            in_block_comment = False
+            idx = 0
+            continue
+        start = processed.find("/*", idx)
+        if start == -1:
+            break
+        end = processed.find("*/", start + 2)
+        if end == -1:
+            # Start of a new block comment; drop the rest and set state
+            processed = processed[:start]
+            in_block_comment = True
+            break
+        # Remove the /* ... */ segment and continue scanning the rest of the line
+        processed = processed[:start] + processed[end + 2 :]
+        idx = start
+    return (processed, in_block_comment)
 
 REQUIRE_VAR_PATTERN_FMT = r"require\s*\(\s*{var}\s*(?:[,)])"
 ASSERT_VAR_PATTERN_FMT = r"assert\s*\(\s*{var}\s*\)"
@@ -51,8 +82,13 @@ def _detect_tx_origin(
     lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
 ) -> Iterator[Finding]:
     severity = "MEDIUM"
-    for idx, line in enumerate(lines, start=1):
+    in_block_comment = False
+    for idx, raw in enumerate(lines, start=1):
         if ignore_next_lines and idx in ignore_next_lines:
+            continue
+        line, in_block_comment = _strip_block_comments(raw, in_block_comment)
+        stripped = line.strip()
+        if not stripped or stripped.startswith("//"):
             continue
         if TX_ORIGIN_PATTERN.search(line):
             yield Finding(
@@ -134,8 +170,13 @@ def _detect_unchecked_low_level_call(
     #    require(var), assert(var), or if(!var) { revert/... }
     window = 3  # lines to look ahead for checks
     severity = "MEDIUM"
-    for idx, line in enumerate(lines, start=1):
+    in_block_comment = False
+    for idx, raw in enumerate(lines, start=1):
         if ignore_next_lines and idx in ignore_next_lines:
+            continue
+        line, in_block_comment = _strip_block_comments(raw, in_block_comment)
+        stripped = line.strip()
+        if not stripped or stripped.startswith("//"):
             continue
         call_match = LOW_LEVEL_CALL_PATTERN.search(line)
         if not call_match:
@@ -147,7 +188,9 @@ def _detect_unchecked_low_level_call(
             var_name = tuple_assign.group("var")
             # Look ahead a few lines for an obvious check of var_name
             for look_ahead in range(0, min(window, len(lines) - idx)):
-                future_line = lines[idx + look_ahead].strip()
+                future_raw = lines[idx + look_ahead]
+                future_line, _ = _strip_block_comments(future_raw, False)
+                future_line = future_line.strip()
                 if re.search(REQUIRE_VAR_PATTERN_FMT.format(var=re.escape(var_name)), future_line):
                     break
                 if re.search(ASSERT_VAR_PATTERN_FMT.format(var=re.escape(var_name)), future_line):
@@ -184,8 +227,13 @@ def _detect_delegatecall_usage(
     # delegatecall executes code in the caller's context and is often dangerous
     # unless used in a well-reviewed proxy pattern.
     severity = "HIGH"
-    for idx, line in enumerate(lines, start=1):
+    in_block_comment = False
+    for idx, raw in enumerate(lines, start=1):
         if ignore_next_lines and idx in ignore_next_lines:
+            continue
+        line, in_block_comment = _strip_block_comments(raw, in_block_comment)
+        stripped = line.strip()
+        if not stripped or stripped.startswith("//"):
             continue
         if DELEGATECALL_PATTERN.search(line):
             yield Finding(
@@ -202,8 +250,13 @@ def _detect_selfdestruct_or_suicide(
     lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
 ) -> Iterator[Finding]:
     severity = "HIGH"
-    for idx, line in enumerate(lines, start=1):
+    in_block_comment = False
+    for idx, raw in enumerate(lines, start=1):
         if ignore_next_lines and idx in ignore_next_lines:
+            continue
+        line, in_block_comment = _strip_block_comments(raw, in_block_comment)
+        stripped = line.strip()
+        if not stripped or stripped.startswith("//"):
             continue
         if SELFDESTRUCT_OR_SUICIDE_PATTERN.search(line):
             keyword = "selfdestruct" if "selfdestruct" in line.lower() else "suicide"
@@ -227,16 +280,28 @@ def _detect_state_var_shadowing(
     in_contract = False
     brace_depth = 0
 
-    # First pass: gather state variables
+    # First pass: gather state variables at contract scope only (brace_depth == 1)
+    decl_re = re.compile(
+        r"""^\s*
+            (?:address|bool|string|
+               bytes(?:\d+)?|
+               u?int(?:\d+)?|
+               mapping\s*\(.*?\)\s*)   # basic types (heuristic)
+            [^;=]*\s
+            (?P<name>[A-Za-z_]\w*)
+            \s*(?:;|=)
+        """,
+        re.IGNORECASE | re.VERBOSE,
+    )
     for raw in lines:
-        line = raw.strip()
         # Track braces to approximate contract scope
         brace_depth += raw.count("{")
         brace_depth -= raw.count("}")
-        if line.startswith("contract "):
+        stripped = raw.strip()
+        if stripped.startswith("contract "):
             in_contract = True
-        if in_contract and ";" in raw:
-            lower = line.lower()
+        if in_contract and ";" in raw and brace_depth == 1:
+            lower = stripped.lower()
             if any(
                 k in lower
                 for k in (
@@ -250,28 +315,9 @@ def _detect_state_var_shadowing(
                 )
             ):
                 continue
-            # Extract the last identifier token before the semicolon as the variable name
-            identifiers = re.findall(r"[A-Za-z_]\w*", raw)
-            if identifiers:
-                candidate = identifiers[-1]
-                # Basic guard: avoid common qualifiers accidentally captured
-                if candidate not in {
-                    "public",
-                    "private",
-                    "internal",
-                    "external",
-                    "constant",
-                    "immutable",
-                    "memory",
-                    "calldata",
-                    "storage",
-                    "payable",
-                    "view",
-                    "pure",
-                    "virtual",
-                    "override",
-                }:
-                    state_vars.add(candidate)
+            m = decl_re.match(raw)
+            if m:
+                state_vars.add(m.group("name"))
         if in_contract and brace_depth <= 0:
             in_contract = False
 
@@ -306,14 +352,13 @@ def _detect_block_timestamp_usage(
     lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
 ) -> Iterator[Finding]:
     severity = "MEDIUM"
-    for idx, line in enumerate(lines, start=1):
+    in_block_comment = False
+    for idx, raw in enumerate(lines, start=1):
         if ignore_next_lines and idx in ignore_next_lines:
             continue
+        line, in_block_comment = _strip_block_comments(raw, in_block_comment)
         stripped = line.strip()
         if not stripped or stripped.startswith("//"):
-            continue
-        # Skip one-line block comments
-        if "/*" in line and "*/" in line:
             continue
         if TIMESTAMP_PATTERN.search(line):
             yield Finding(
