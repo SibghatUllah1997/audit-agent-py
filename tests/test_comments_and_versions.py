@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sibaudit.scanner import scan_paths, _is_pre_0_8_solidity
+from sibaudit.scanner import _is_pre_0_8_solidity, scan_paths
 
 
 def test_inline_block_comment_is_stripped(tmp_path: Path) -> None:

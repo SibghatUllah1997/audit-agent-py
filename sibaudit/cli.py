@@ -4,8 +4,8 @@ import argparse
 import sys
 from pathlib import Path
 
-from .scanner import scan_paths
 from . import __version__ as SIBAUDIT_VERSION
+from .scanner import scan_paths
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -75,7 +75,10 @@ def main(argv: list[str] | None = None) -> None:
                 "id": "A003",
                 "shortDescription": {"text": "Use of delegatecall"},
                 "fullDescription": {
-                    "text": "Use of delegatecall detected; review proxy pattern and calldata handling."
+                    "text": (
+                        "Use of delegatecall detected; review proxy pattern and "
+                        "calldata handling."
+                    )
                 },
                 "defaultConfiguration": {"level": level_map["HIGH"]},
             },
@@ -83,7 +86,10 @@ def main(argv: list[str] | None = None) -> None:
                 "id": "A004",
                 "shortDescription": {"text": "Use of selfdestruct/suicide"},
                 "fullDescription": {
-                    "text": "Use of selfdestruct/suicide detected; can brick contracts and break integrations."
+                    "text": (
+                        "Use of selfdestruct/suicide detected; can brick contracts "
+                        "and break integrations."
+                    )
                 },
                 "defaultConfiguration": {"level": level_map["HIGH"]},
             },
