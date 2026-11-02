@@ -1,3 +1,119 @@
+### sibaudit — fast Solidity heuristic scanner
+
+Small, no-deps Python CLI that flags risky patterns in Solidity contracts — great for quick reviews and CI gates.
+
+[![CI](https://github.com/SibghatUllah1997/audit-agent-py/actions/workflows/ci.yml/badge.svg)](https://github.com/SibghatUllah1997/audit-agent-py/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
+Why it matters
+- Solidity footguns still slip into production: low-level calls without checks, dangerous `delegatecall`, time manipulation, and pre-0.8 math overflows.
+- sibaudit gives instant, readable feedback that complements deeper tools.
+
+Rules
+
+| Code | Severity | Flags |
+|------|----------|-------|
+| A001 | MEDIUM   | Risky use of `tx.origin` |
+| A002 | MEDIUM   | Low-level call without capturing/validating success (heuristic) |
+| A003 | HIGH     | Any `delegatecall` usage |
+| A004 | HIGH     | `selfdestruct` / `suicide` |
+| A005 | LOW      | Function parameter shadows a state variable (heuristic) |
+| A006 | MEDIUM   | `block.timestamp` / `now` usage |
+| A007 | MEDIUM   | Unchecked arithmetic in pre-0.8 Solidity |
+
+Install
+- Python 3.11+
+- Install editable or regular:
+
+```bash
+python3 -m pip install -e .
+# or
+python3 -m pip install sibaudit
+```
+
+Quick CLI demo
+- Try the bundled vulnerable sample:
+
+```bash
+sibaudit examples/Vulnerable.sol
+```
+
+Example output (real):
+
+```
+/workspace/examples/Vulnerable.sol:12: A001 Potential risky use of tx.origin (often unsafe for auth).
+/workspace/examples/Vulnerable.sol:11: A002 Low-level call without capturing/validating success (heuristic).
+/workspace/examples/Vulnerable.sol:19: A002 Low-level call without capturing/validating success (heuristic).
+/workspace/examples/Vulnerable.sol:19: A003 Use of delegatecall detected; review proxy pattern and calldata handling.
+/workspace/examples/Vulnerable.sol:25: A004 Use of selfdestruct detected; can brick contracts and break integrations.
+/workspace/examples/Vulnerable.sol:17: A005 Function parameter "data" shadows a state variable.
+/workspace/examples/Vulnerable.sol:23: A005 Function parameter "to" shadows a state variable.
+/workspace/examples/Vulnerable.sol:35: A005 Function parameter "owner" shadows a state variable.
+/workspace/examples/Vulnerable.sol:31: A006 Use of block.timestamp/now detected; time can be manipulated slightly.
+/workspace/examples/Vulnerable.sol:43: A007 Unchecked arithmetic in pre-0.8 Solidity (overflow/underflow risk).
+```
+
+Notes
+- Text output format is `path:line: CODE message`. Exit code is 1 when findings exist, else 0.
+
+JSON output
+
+You can emit newline-delimited JSON records instead of text:
+
+```bash
+python3 -m sibaudit --format json path/to/contracts > findings.ndjson
+```
+
+Each line is a JSON object with:
+
+- `file_path` (string)
+- `line_number` (int)
+- `code` (string, e.g. `A001`)
+- `severity` (string: `LOW` | `MEDIUM` | `HIGH`)
+- `message` (string)
+
+Ignoring one line
+
+Add the following directive on a line to ignore the very next line (for all rules):
+
+```solidity
+// sibaudit:ignore-next-line
+address a = tx.origin; // this line will be ignored
+```
+
+Testing
+- Lint with ruff; tests use pytest.
+- Run:
+
+```bash
+python3 -m ruff check .
+python3 -m pytest -q
+```
+
+Architecture (sketch)
+
+```mermaid
+flowchart TD
+    A[CLI args] --> B[Path discovery]
+    B --> C{*.sol files}
+    C -->|read file| D[Line split]
+    D --> E1[tx.origin]
+    D --> E2[low-level calls]
+    D --> E3[delegatecall]
+    D --> E4[selfdestruct/suicide]
+    D --> E5[shadowing heuristic]
+    D --> E6[timestamp usage]
+    D --> E7[pre-0.8 arithmetic]
+    E1 & E2 & E3 & E4 & E5 & E6 & E7 --> F[Findings list]
+    F -->|--format text/json| G[stdout + exit code]
+```
+
+Roadmap
+- See `ROADMAP.md`.
+
+License
+
+MIT © 2026 HM Sibghat Ullah
 # Sibghat's Solidity Audit Helper
 
 A tiny, educational Python CLI that scans Solidity (`.sol`) files for a few well-known risky patterns:
