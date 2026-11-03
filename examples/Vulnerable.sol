@@ -3,6 +3,7 @@ pragma solidity ^0.7.6;
 
 contract Vulnerable {
     address public owner;
+    mapping(address => uint256) public balances;
 
     // Unchecked low-level call and origin usage
     function ping(address target) external {
@@ -42,6 +43,19 @@ contract Vulnerable {
         // A007
         uint256 c = a + b;
         return c;
+    }
+
+    // reentrancy: external call then storage write
+    function withdraw() external {
+        // A008
+        payable(msg.sender).call{value: balances[msg.sender]}("");
+        balances[msg.sender] = 0;
+    }
+
+    // missing access control on a privileged mint
+    function mint(address recipient, uint256 qty) external {
+        // A009
+        balances[recipient] += qty;
     }
 }
 
