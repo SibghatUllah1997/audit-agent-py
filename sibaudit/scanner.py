@@ -43,6 +43,45 @@ INCREMENT_PATTERN = re.compile(
     r"(?:\+\+|--)\s*[A-Za-z_]\w*|[A-Za-z_]\w*(?:\s*\[[^\]]*\])*\s*(?:\+\+|--)"
 )
 DELETE_STATE_PATTERN = re.compile(r"\bdelete\s+[A-Za-z_]\w*")
+ACCESS_MODIFIER_PATTERN = re.compile(
+    r"\bonly[A-Z]\w*\b|\b(?:onlyRole|restricted|auth|requiresAuth)\b"
+)
+SENDER_GUARD_PATTERN = re.compile(
+    r"require\s*\(\s*(?:msg\.sender\s*==|[A-Za-z_]\w*\s*==\s*msg\.sender)"
+    r"|if\s*\(\s*msg\.sender\s*!="
+    r"|\bhasRole\s*\(",
+    re.IGNORECASE,
+)
+SENSITIVE_BODY_PATTERN = re.compile(
+    r"\b(?:selfdestruct|suicide)\s*\("
+    r"|(?<![A-Za-z_])owner\s*=(?!=)"
+    r"|\.delegatecall\s*(?:\{[^}]*\})?\s*\(",
+    re.IGNORECASE,
+)
+SENSITIVE_FUNC_NAMES = frozenset(
+    {
+        "setowner",
+        "transferownership",
+        "renounceownership",
+        "mint",
+        "burn",
+        "pause",
+        "unpause",
+        "kill",
+        "destroy",
+        "nuke",
+        "upgradeto",
+        "upgrade",
+        "initialize",
+        "init",
+        "sweep",
+        "withdrawall",
+        "setadmin",
+        "changeowner",
+        "setprice",
+        "setfee",
+    }
+)
 HEADER_SKIP_TOKENS = frozenset(
     {
         "external",
@@ -472,6 +511,41 @@ def _detect_block_timestamp_usage(
             )
 
 
+def _detect_missing_access_control(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    # Heuristic: public/external functions that look privileged (by name or body)
+    # and have no obvious modifier or msg.sender check.
+    severity = "HIGH"
+    for func in _iter_functions(lines):
+        if ignore_next_lines and func.start_line in ignore_next_lines:
+            continue
+        if func.is_view_or_pure:
+            continue
+        if func.visibility in {"internal", "private"}:
+            continue
+        body = "\n".join(
+            _without_line_comment(lines[idx])
+            for idx in range(func.start_line - 1, func.end_line)
+        )
+        name_hit = func.name.lower() in SENSITIVE_FUNC_NAMES
+        body_hit = bool(SENSITIVE_BODY_PATTERN.search(body))
+        if not name_hit and not body_hit:
+            continue
+        if ACCESS_MODIFIER_PATTERN.search(func.header):
+            continue
+        if SENDER_GUARD_PATTERN.search(body):
+            continue
+        yield Finding(
+            file_path=file_path,
+            line_number=func.start_line,
+            code="A009",
+            severity=severity,
+            message="Sensitive function appears to lack access control (heuristic).",
+            line_text=lines[func.start_line - 1].rstrip(),
+        )
+
+
 def _detect_reentrancy_prone_calls(
     lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
 ) -> Iterator[Finding]:
@@ -528,5 +602,6 @@ def scan_paths(paths: Iterable[str]) -> list[Finding]:
         findings.extend(_detect_block_timestamp_usage(lines, file_path, ignore_next_lines))
         findings.extend(_detect_pre_08_unchecked_arithmetic(lines, file_path, ignore_next_lines))
         findings.extend(_detect_reentrancy_prone_calls(lines, file_path, ignore_next_lines))
+        findings.extend(_detect_missing_access_control(lines, file_path, ignore_next_lines))
     return findings
 
