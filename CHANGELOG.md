@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-03
+- Added a reentrancy heuristic that flags external calls made before state is updated.
+- Added a check for sensitive functions that appear to lack access control.
+- Documented both rules and marked days 10 and 11 on the roadmap.
+
 ## 2026-11-01
 - Added rule A006 to flag `block.timestamp`/`now` usage and corresponding tests.
 - Added rule A007 to flag unchecked arithmetic in pre-0.8 contracts with tests.
