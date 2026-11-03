@@ -21,6 +21,48 @@ TIMESTAMP_PATTERN = re.compile(r"\b(?:block\.timestamp|now)\b")
 ARITH_EXPR_PATTERN = re.compile(
     r"(?:[A-Za-z_]\w*|\d+)\s*[\+\-\*\/]\s*(?:[A-Za-z_]\w*|\d+|\()"
 )
+EXTERNAL_INTERACTION_PATTERN = re.compile(
+    r"\.(?:call|delegatecall|callcode|transfer|send)\s*(?:\{[^}]*\})?\s*\(",
+    re.IGNORECASE,
+)
+FUNC_START_PATTERN = re.compile(r"\bfunction\s+([A-Za-z_]\w*)\s*\(")
+VISIBILITY_PATTERN = re.compile(r"\b(external|public|internal|private)\b")
+VIEW_PURE_PATTERN = re.compile(r"\b(?:view|pure)\b")
+TYPE_DECL_HEAD_PATTERN = re.compile(
+    r"^\s*\(?\s*(?:"
+    r"bool|address(?:\s+payable)?|string(?:\s+(?:memory|calldata|storage))?|"
+    r"bytes\d*|bytes(?:\s+(?:memory|calldata|storage))?|"
+    r"u?int\d*|mapping\b"
+    r")\b",
+    re.IGNORECASE,
+)
+STATE_WRITE_PATTERN = re.compile(
+    r"[A-Za-z_]\w*(?:\s*\[[^\]]*\])*\s*(?:\+=|-=|\*=|/=|\|=|&=|\^=|=(?!=))"
+)
+INCREMENT_PATTERN = re.compile(
+    r"(?:\+\+|--)\s*[A-Za-z_]\w*|[A-Za-z_]\w*(?:\s*\[[^\]]*\])*\s*(?:\+\+|--)"
+)
+DELETE_STATE_PATTERN = re.compile(r"\bdelete\s+[A-Za-z_]\w*")
+HEADER_SKIP_TOKENS = frozenset(
+    {
+        "external",
+        "public",
+        "internal",
+        "private",
+        "view",
+        "pure",
+        "payable",
+        "virtual",
+        "override",
+        "returns",
+        "memory",
+        "calldata",
+        "storage",
+        "constant",
+        "immutable",
+        "nonpayable",
+    }
+)
 
 REQUIRE_VAR_PATTERN_FMT = r"require\s*\(\s*{var}\s*(?:[,)])"
 ASSERT_VAR_PATTERN_FMT = r"assert\s*\(\s*{var}\s*\)"
@@ -37,6 +79,17 @@ class Finding:
     line_text: str
 
 
+@dataclass(frozen=True)
+class _FunctionInfo:
+    name: str
+    start_line: int
+    end_line: int
+    header: str
+    visibility: str
+    modifiers: tuple[str, ...]
+    is_view_or_pure: bool
+
+
 def _iter_solidity_files(paths: Iterable[Path]) -> Iterator[Path]:
     for p in paths:
         if p.is_file() and p.suffix.lower() == ".sol":
@@ -45,6 +98,99 @@ def _iter_solidity_files(paths: Iterable[Path]) -> Iterator[Path]:
             for sub in p.rglob("*.sol"):
                 if sub.is_file():
                     yield sub
+
+
+def _without_line_comment(line: str) -> str:
+    idx = line.find("//")
+    if idx >= 0:
+        return line[:idx]
+    return line
+
+
+def _iter_functions(lines: list[str]) -> Iterator[_FunctionInfo]:
+    n = len(lines)
+    i = 0
+    while i < n:
+        match = FUNC_START_PATTERN.search(_without_line_comment(lines[i]))
+        if not match:
+            i += 1
+            continue
+        name = match.group(1)
+        header_chunks: list[str] = []
+        paren = 0
+        seen_open_paren = False
+        params_closed = False
+        body_open_i: int | None = None
+        is_proto = False
+        j = i
+        while j < n:
+            piece = _without_line_comment(lines[j])
+            header_chunks.append(piece)
+            for ch in piece:
+                if ch == "(":
+                    paren += 1
+                    seen_open_paren = True
+                elif ch == ")":
+                    paren -= 1
+                    if seen_open_paren and paren == 0:
+                        params_closed = True
+                elif params_closed and paren == 0 and ch == "{":
+                    body_open_i = j
+                    break
+                elif params_closed and paren == 0 and ch == ";":
+                    is_proto = True
+                    break
+            if body_open_i is not None or is_proto:
+                break
+            j += 1
+        if is_proto or body_open_i is None:
+            i = j + 1
+            continue
+        brace = 0
+        started = False
+        end_i = body_open_i
+        k = body_open_i
+        while k < n:
+            piece = _without_line_comment(lines[k])
+            for ch in piece:
+                if ch == "{":
+                    brace += 1
+                    started = True
+                elif ch == "}":
+                    brace -= 1
+                    if started and brace == 0:
+                        end_i = k
+                        break
+            if started and brace == 0:
+                break
+            k += 1
+        header = "\n".join(header_chunks)
+        vis_match = VISIBILITY_PATTERN.search(header)
+        after_params = header.split(")", 1)[-1].split("{", 1)[0]
+        tokens = re.findall(r"[A-Za-z_]\w*", after_params)
+        yield _FunctionInfo(
+            name=name,
+            start_line=i + 1,
+            end_line=end_i + 1,
+            header=header,
+            visibility=vis_match.group(1) if vis_match else "",
+            modifiers=tuple(t for t in tokens if t not in HEADER_SKIP_TOKENS),
+            is_view_or_pure=bool(VIEW_PURE_PATTERN.search(header)),
+        )
+        i = end_i + 1
+
+
+def _looks_like_state_write(line: str) -> bool:
+    stripped = _without_line_comment(line).strip()
+    if not stripped:
+        return False
+    if TYPE_DECL_HEAD_PATTERN.match(stripped):
+        return False
+    if DELETE_STATE_PATTERN.search(stripped):
+        return True
+    if INCREMENT_PATTERN.search(stripped):
+        return True
+    return bool(STATE_WRITE_PATTERN.search(stripped))
 
 
 def _detect_tx_origin(
@@ -326,6 +472,38 @@ def _detect_block_timestamp_usage(
             )
 
 
+def _detect_reentrancy_prone_calls(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    # Heuristic: in a mutating function, an external call that is later
+    # followed by a storage write is the classic checks-effects-interactions miss.
+    severity = "HIGH"
+    for func in _iter_functions(lines):
+        if func.is_view_or_pure:
+            continue
+        call_lines: list[int] = []
+        write_lines: list[int] = []
+        for lineno in range(func.start_line, func.end_line + 1):
+            raw = lines[lineno - 1]
+            code = _without_line_comment(raw)
+            if EXTERNAL_INTERACTION_PATTERN.search(code):
+                call_lines.append(lineno)
+            if _looks_like_state_write(raw):
+                write_lines.append(lineno)
+        for call_line in call_lines:
+            if ignore_next_lines and call_line in ignore_next_lines:
+                continue
+            if any(write_line > call_line for write_line in write_lines):
+                yield Finding(
+                    file_path=file_path,
+                    line_number=call_line,
+                    code="A008",
+                    severity=severity,
+                    message="External call before state update looks reentrancy-prone (heuristic).",
+                    line_text=lines[call_line - 1].rstrip(),
+                )
+
+
 def scan_paths(paths: Iterable[str]) -> list[Finding]:
     root_paths = [Path(p).resolve() for p in paths]
     findings: list[Finding] = []
@@ -349,5 +527,6 @@ def scan_paths(paths: Iterable[str]) -> list[Finding]:
         findings.extend(_detect_state_var_shadowing(lines, file_path, ignore_next_lines))
         findings.extend(_detect_block_timestamp_usage(lines, file_path, ignore_next_lines))
         findings.extend(_detect_pre_08_unchecked_arithmetic(lines, file_path, ignore_next_lines))
+        findings.extend(_detect_reentrancy_prone_calls(lines, file_path, ignore_next_lines))
     return findings
 
