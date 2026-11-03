@@ -20,6 +20,8 @@ Rules
 | A005 | LOW      | Function parameter shadows a state variable (heuristic) |
 | A006 | MEDIUM   | `block.timestamp` / `now` usage |
 | A007 | MEDIUM   | Unchecked arithmetic in pre-0.8 Solidity |
+| A008 | HIGH     | External call before a later state update (reentrancy heuristic) |
+| A009 | HIGH     | Sensitive function that appears to lack access control |
 
 Install
 - Python 3.11+
@@ -41,16 +43,22 @@ sibaudit examples/Vulnerable.sol
 Example output (real):
 
 ```
-/workspace/examples/Vulnerable.sol:12: A001 Potential risky use of tx.origin (often unsafe for auth).
-/workspace/examples/Vulnerable.sol:11: A002 Low-level call without capturing/validating success (heuristic).
-/workspace/examples/Vulnerable.sol:19: A002 Low-level call without capturing/validating success (heuristic).
-/workspace/examples/Vulnerable.sol:19: A003 Use of delegatecall detected; review proxy pattern and calldata handling.
-/workspace/examples/Vulnerable.sol:25: A004 Use of selfdestruct detected; can brick contracts and break integrations.
-/workspace/examples/Vulnerable.sol:17: A005 Function parameter "data" shadows a state variable.
-/workspace/examples/Vulnerable.sol:23: A005 Function parameter "to" shadows a state variable.
-/workspace/examples/Vulnerable.sol:35: A005 Function parameter "owner" shadows a state variable.
-/workspace/examples/Vulnerable.sol:31: A006 Use of block.timestamp/now detected; time can be manipulated slightly.
-/workspace/examples/Vulnerable.sol:43: A007 Unchecked arithmetic in pre-0.8 Solidity (overflow/underflow risk).
+/workspace/examples/Vulnerable.sol:13: A001 Potential risky use of tx.origin (often unsafe for auth).
+/workspace/examples/Vulnerable.sol:12: A002 Low-level call without capturing/validating success (heuristic).
+/workspace/examples/Vulnerable.sol:20: A002 Low-level call without capturing/validating success (heuristic).
+/workspace/examples/Vulnerable.sol:20: A003 Use of delegatecall detected; review proxy pattern and calldata handling.
+/workspace/examples/Vulnerable.sol:26: A004 Use of selfdestruct detected; can brick contracts and break integrations.
+/workspace/examples/Vulnerable.sol:18: A005 Function parameter "data" shadows a state variable.
+/workspace/examples/Vulnerable.sol:24: A005 Function parameter "to" shadows a state variable.
+/workspace/examples/Vulnerable.sol:36: A005 Function parameter "owner" shadows a state variable.
+/workspace/examples/Vulnerable.sol:56: A005 Function parameter "qty" shadows a state variable.
+/workspace/examples/Vulnerable.sol:32: A006 Use of block.timestamp/now detected; time can be manipulated slightly.
+/workspace/examples/Vulnerable.sol:44: A007 Unchecked arithmetic in pre-0.8 Solidity (overflow/underflow risk).
+/workspace/examples/Vulnerable.sol:51: A008 External call before state update looks reentrancy-prone (heuristic).
+/workspace/examples/Vulnerable.sol:18: A009 Sensitive function appears to lack access control (heuristic).
+/workspace/examples/Vulnerable.sol:24: A009 Sensitive function appears to lack access control (heuristic).
+/workspace/examples/Vulnerable.sol:36: A009 Sensitive function appears to lack access control (heuristic).
+/workspace/examples/Vulnerable.sol:56: A009 Sensitive function appears to lack access control (heuristic).
 ```
 
 Notes
@@ -104,7 +112,9 @@ flowchart TD
     D --> E5[shadowing heuristic]
     D --> E6[timestamp usage]
     D --> E7[pre-0.8 arithmetic]
-    E1 & E2 & E3 & E4 & E5 & E6 & E7 --> F[Findings list]
+    D --> E8[reentrancy heuristic]
+    D --> E9[missing access control]
+    E1 & E2 & E3 & E4 & E5 & E6 & E7 & E8 & E9 --> F[Findings list]
     F -->|--format text/json| G[stdout + exit code]
 ```
 
@@ -124,6 +134,8 @@ A tiny, educational Python CLI that scans Solidity (`.sol`) files for a few well
 - Use of `selfdestruct` / `suicide`
 - Use of `block.timestamp` / `now`
 - Unchecked arithmetic in pre-0.8 Solidity
+- External calls that happen before a later storage write (reentrancy-prone)
+- Privileged functions that appear to lack access control
 
 This is an intentionally minimal, static checker to bootstrap a daily portfolio project.
 
@@ -180,6 +192,8 @@ address a = tx.origin; // this line will be ignored
 - A005 (LOW): State variable shadowing by a parameter or local variable (heuristic)
 - A006 (MEDIUM): Use of `block.timestamp` / `now` (time can be manipulated slightly)
 - A007 (MEDIUM): Unchecked arithmetic in pre-0.8 Solidity (overflow/underflow risk)
+- A008 (HIGH): External call before a later state update (reentrancy heuristic)
+- A009 (HIGH): Sensitive function that appears to lack access control (heuristic)
 
 ## What this is (and isn’t)
 
