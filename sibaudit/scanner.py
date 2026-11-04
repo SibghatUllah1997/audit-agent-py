@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+
+from .globs import is_selected
 
 # Basic risky patterns
 TX_ORIGIN_PATTERN = re.compile(r"\btx\.origin\b")
@@ -155,13 +157,19 @@ class _FunctionInfo:
     is_view_or_pure: bool
 
 
-def _iter_solidity_files(paths: Iterable[Path]) -> Iterator[Path]:
+def _iter_solidity_files(
+    paths: Iterable[Path],
+    include: Sequence[str] | None = None,
+    exclude: Sequence[str] | None = None,
+) -> Iterator[Path]:
     for p in paths:
         if p.is_file() and p.suffix.lower() == ".sol":
-            yield p
+            # A file given directly is matched by its name only.
+            if is_selected(p.name, include, exclude):
+                yield p
         elif p.is_dir():
-            for sub in p.rglob("*.sol"):
-                if sub.is_file():
+            for sub in sorted(p.rglob("*.sol")):
+                if sub.is_file() and is_selected(sub.relative_to(p).as_posix(), include, exclude):
                     yield sub
 
 
@@ -705,10 +713,14 @@ def _detect_assert_misuse(
             )
 
 
-def scan_paths(paths: Iterable[str]) -> list[Finding]:
+def scan_paths(
+    paths: Iterable[str],
+    include: Sequence[str] | None = None,
+    exclude: Sequence[str] | None = None,
+) -> list[Finding]:
     root_paths = [Path(p).resolve() for p in paths]
     findings: list[Finding] = []
-    for file_path in _iter_solidity_files(root_paths):
+    for file_path in _iter_solidity_files(root_paths, include, exclude):
         try:
             content = file_path.read_text(encoding="utf-8", errors="ignore")
         except Exception:
