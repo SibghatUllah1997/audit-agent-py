@@ -105,6 +105,20 @@ HEADER_SKIP_TOKENS = frozenset(
 
 GASPRICE_PATTERN = re.compile(r"\btx\.gasprice\b")
 
+EVENT_DECL_PATTERN = re.compile(r"\bevent\s+(?P<name>[A-Za-z_]\w*)\s*\((?P<params>[^)]*)\)")
+VALUE_EVENT_NAME_PATTERN = re.compile(
+    r"transfer|deposit|withdraw|mint|burn|payment|purchase|bid|sale|"
+    r"payout|reward|fee|donate|stake|unstake|claim",
+    re.IGNORECASE,
+)
+ADDRESS_EVENT_NAME_PATTERN = re.compile(
+    r"transfer|approval|owner|admin|operator|deposit|withdraw|mint|burn|"
+    r"claim|stake|send|receive",
+    re.IGNORECASE,
+)
+UINT_PARAM_PATTERN = re.compile(r"\bu?int(?:\d+)?\b", re.IGNORECASE)
+ADDRESS_PARAM_PATTERN = re.compile(r"\baddress\b", re.IGNORECASE)
+
 ASSERT_CALL_PATTERN = re.compile(r"\bassert\s*\((?P<expr>.*)\)")
 USER_INPUT_PATTERN = re.compile(
     r"\bmsg\.(?:sender|value|data)\b|\btx\.origin\b|\.balance\b|\bbalanceOf\s*\("
@@ -602,6 +616,38 @@ def _detect_tx_gasprice_usage(
             )
 
 
+def _detect_events_missing_critical_params(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    # Events that record value movement or privilege changes should carry the
+    # amount and/or address so off-chain indexers can reconstruct what happened.
+    for idx, line in enumerate(lines, start=1):
+        if ignore_next_lines and idx in ignore_next_lines:
+            continue
+        code = _without_line_comment(line)
+        match = EVENT_DECL_PATTERN.search(code)
+        if not match:
+            continue
+        name = match.group("name")
+        params = match.group("params")
+        missing: list[str] = []
+        if VALUE_EVENT_NAME_PATTERN.search(name) and not UINT_PARAM_PATTERN.search(params):
+            missing.append("amount")
+        if ADDRESS_EVENT_NAME_PATTERN.search(name) and not ADDRESS_PARAM_PATTERN.search(params):
+            missing.append("address")
+        if not missing:
+            continue
+        detail = " and ".join(missing)
+        yield Finding(
+            file_path=file_path,
+            line_number=idx,
+            code="A012",
+            severity="LOW",
+            message=f'Event "{name}" is missing a critical {detail} parameter.',
+            line_text=line.rstrip(),
+        )
+
+
 def _detect_assert_misuse(
     lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
 ) -> Iterator[Finding]:
@@ -649,5 +695,6 @@ def scan_paths(paths: Iterable[str]) -> list[Finding]:
         findings.extend(_detect_missing_access_control(lines, file_path, ignore_next_lines))
         findings.extend(_detect_tx_gasprice_usage(lines, file_path, ignore_next_lines))
         findings.extend(_detect_assert_misuse(lines, file_path, ignore_next_lines))
+        findings.extend(_detect_events_missing_critical_params(lines, file_path, ignore_next_lines))
     return findings
 
