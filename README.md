@@ -24,6 +24,8 @@ Rules
 | A009 | HIGH     | Sensitive function that appears to lack access control |
 | A010 | LOW      | Logic that relies on `tx.gasprice` |
 | A011 | LOW      | `assert` used on caller input or balances (use `require`) |
+| A012 | LOW      | Event missing a critical amount or address parameter |
+| A013 | MEDIUM   | `blockhash` used as randomness or on the current block |
 
 Install
 - Python 3.11+
@@ -198,6 +200,8 @@ address a = tx.origin; // this line will be ignored
 - A009 (HIGH): Sensitive function that appears to lack access control (heuristic)
 - A010 (LOW): Logic relies on `tx.gasprice`, which the sender controls
 - A011 (LOW): `assert` checks caller input or balances; prefer `require`
+- A012 (LOW): Event missing a critical amount or address parameter
+- A013 (MEDIUM): `blockhash` is miner-influenceable; current-block hash is always zero
 
 ## What this is (and isn’t)
 
