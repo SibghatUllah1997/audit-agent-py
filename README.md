@@ -22,6 +22,8 @@ Rules
 | A007 | MEDIUM   | Unchecked arithmetic in pre-0.8 Solidity |
 | A008 | HIGH     | External call before a later state update (reentrancy heuristic) |
 | A009 | HIGH     | Sensitive function that appears to lack access control |
+| A010 | LOW      | Logic that relies on `tx.gasprice` |
+| A011 | LOW      | `assert` used on caller input or balances (use `require`) |
 
 Install
 - Python 3.11+
@@ -194,6 +196,8 @@ address a = tx.origin; // this line will be ignored
 - A007 (MEDIUM): Unchecked arithmetic in pre-0.8 Solidity (overflow/underflow risk)
 - A008 (HIGH): External call before a later state update (reentrancy heuristic)
 - A009 (HIGH): Sensitive function that appears to lack access control (heuristic)
+- A010 (LOW): Logic relies on `tx.gasprice`, which the sender controls
+- A011 (LOW): `assert` checks caller input or balances; prefer `require`
 
 ## What this is (and isn’t)
 
