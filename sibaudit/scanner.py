@@ -118,6 +118,11 @@ ADDRESS_EVENT_NAME_PATTERN = re.compile(
 )
 UINT_PARAM_PATTERN = re.compile(r"\bu?int(?:\d+)?\b", re.IGNORECASE)
 ADDRESS_PARAM_PATTERN = re.compile(r"\baddress\b", re.IGNORECASE)
+BLOCKHASH_CALL_PATTERN = re.compile(r"\b(?:blockhash|block\.blockhash)\s*\(", re.IGNORECASE)
+BLOCKHASH_CURRENT_PATTERN = re.compile(
+    r"\b(?:blockhash|block\.blockhash)\s*\(\s*block\.number\s*\)",
+    re.IGNORECASE,
+)
 
 ASSERT_CALL_PATTERN = re.compile(r"\bassert\s*\((?P<expr>.*)\)")
 USER_INPUT_PATTERN = re.compile(
@@ -616,6 +621,38 @@ def _detect_tx_gasprice_usage(
             )
 
 
+def _detect_blockhash_misuse(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    # blockhash is only defined for the 256 most recent blocks, is miner-
+    # influenceable, and blockhash(block.number) is always zero.
+    for idx, line in enumerate(lines, start=1):
+        if ignore_next_lines and idx in ignore_next_lines:
+            continue
+        stripped = line.strip()
+        if not stripped or stripped.startswith("//"):
+            continue
+        if "/*" in line and "*/" in line:
+            continue
+        code = _without_line_comment(line)
+        if not BLOCKHASH_CALL_PATTERN.search(code):
+            continue
+        if BLOCKHASH_CURRENT_PATTERN.search(code):
+            message = "blockhash(block.number) is always zero and cannot seed randomness."
+        else:
+            message = (
+                "blockhash is miner-influenceable and only defined for the last 256 blocks."
+            )
+        yield Finding(
+            file_path=file_path,
+            line_number=idx,
+            code="A013",
+            severity="MEDIUM",
+            message=message,
+            line_text=line.rstrip(),
+        )
+
+
 def _detect_events_missing_critical_params(
     lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
 ) -> Iterator[Finding]:
@@ -696,5 +733,6 @@ def scan_paths(paths: Iterable[str]) -> list[Finding]:
         findings.extend(_detect_tx_gasprice_usage(lines, file_path, ignore_next_lines))
         findings.extend(_detect_assert_misuse(lines, file_path, ignore_next_lines))
         findings.extend(_detect_events_missing_critical_params(lines, file_path, ignore_next_lines))
+        findings.extend(_detect_blockhash_misuse(lines, file_path, ignore_next_lines))
     return findings
 
