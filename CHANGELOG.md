@@ -1,6 +1,8 @@
 # Changelog
 
 ## 2026-11-04
+- Added repeatable `--include` and `--exclude` glob options to choose which files are scanned.
+- Documented the new options and marked day 16 on the roadmap.
 - Added rule A012 to flag events that omit amounts, addresses, or other critical parameters.
 - Added rule A013 to flag `blockhash` used as randomness or on the current block (always zero).
 - Documented both codes and marked days 14 and 15 on the roadmap.
