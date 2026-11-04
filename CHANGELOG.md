@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-04
+- Added rule A010 to flag contract logic that relies on `tx.gasprice`.
+- Added rule A011 to flag `assert` used on caller input or balances, where `require` fits better.
+- Documented both codes and marked days 12 and 13 on the roadmap.
+
 ## 2026-11-03
 - Added a reentrancy heuristic that flags external calls made before state is updated.
 - Added a check for sensitive functions that appear to lack access control.

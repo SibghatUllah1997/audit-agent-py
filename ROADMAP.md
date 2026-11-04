@@ -11,8 +11,8 @@
 - [x] Day 9: Add rule for numeric underflow/overflow patterns (pre-0.8)
 - [x] Day 10: Add rule for reentrancy-prone external calls (heuristic)
 - [x] Day 11: Add rule for missing access control on sensitive funcs
-- Day 12: Add rule for `tx.gasprice` reliance
-- Day 13: Add rule for `assert` misuse (business logic)
+- [x] Day 12: Add rule for `tx.gasprice` reliance
+- [x] Day 13: Add rule for `assert` misuse (business logic)
 - Day 14: Add rule for events missing critical parameters
 - Day 15: Add rule for `blockhash` misuse
 - Day 16: Configurable include/exclude globs
