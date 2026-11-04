@@ -1,6 +1,9 @@
 # Changelog
 
 ## 2026-11-04
+- Added rule A012 to flag events that omit amounts, addresses, or other critical parameters.
+- Added rule A013 to flag `blockhash` used as randomness or on the current block (always zero).
+- Documented both codes and marked days 14 and 15 on the roadmap.
 - Added rule A010 to flag contract logic that relies on `tx.gasprice`.
 - Added rule A011 to flag `assert` used on caller input or balances, where `require` fits better.
 - Documented both codes and marked days 12 and 13 on the roadmap.

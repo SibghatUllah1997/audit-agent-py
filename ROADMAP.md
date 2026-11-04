@@ -13,8 +13,8 @@
 - [x] Day 11: Add rule for missing access control on sensitive funcs
 - [x] Day 12: Add rule for `tx.gasprice` reliance
 - [x] Day 13: Add rule for `assert` misuse (business logic)
-- Day 14: Add rule for events missing critical parameters
-- Day 15: Add rule for `blockhash` misuse
+- [x] Day 14: Add rule for events missing critical parameters
+- [x] Day 15: Add rule for `blockhash` misuse
 - Day 16: Configurable include/exclude globs
 - Day 17: Baseline suppression file
 - Day 18: Rich summary report with counts per rule
