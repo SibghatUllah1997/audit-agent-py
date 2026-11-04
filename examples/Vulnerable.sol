@@ -57,5 +57,19 @@ contract Vulnerable {
         // A009
         balances[recipient] += qty;
     }
+
+    // event missing a critical amount parameter
+    event Transfer(address from, address to);
+
+    function logMove(address from, address to) external {
+        // A012
+        emit Transfer(from, to);
+    }
+
+    // blockhash of the current block is always zero
+    function raffle() external view returns (uint256) {
+        // A013
+        return uint256(blockhash(block.number));
+    }
 }
 

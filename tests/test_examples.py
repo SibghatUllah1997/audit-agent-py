@@ -13,3 +13,11 @@ def test_sample_contract_flags_reentrancy_and_access_control() -> None:
     assert {"A008", "A009"} <= codes
     assert any(f.code == "A008" and ".call" in f.line_text for f in findings)
     assert any(f.code == "A009" and "mint" in f.line_text for f in findings)
+
+
+def test_sample_contract_flags_event_params_and_blockhash() -> None:
+    findings = scan_paths([str(EXAMPLES)])
+    codes = {f.code for f in findings}
+    assert {"A012", "A013"} <= codes
+    assert any(f.code == "A012" and "Transfer" in f.line_text for f in findings)
+    assert any(f.code == "A013" and "blockhash" in f.line_text for f in findings)
