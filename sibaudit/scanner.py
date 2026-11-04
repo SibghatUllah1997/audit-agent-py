@@ -105,6 +105,11 @@ HEADER_SKIP_TOKENS = frozenset(
 
 GASPRICE_PATTERN = re.compile(r"\btx\.gasprice\b")
 
+ASSERT_CALL_PATTERN = re.compile(r"\bassert\s*\((?P<expr>.*)\)")
+USER_INPUT_PATTERN = re.compile(
+    r"\bmsg\.(?:sender|value|data)\b|\btx\.origin\b|\.balance\b|\bbalanceOf\s*\("
+)
+
 REQUIRE_VAR_PATTERN_FMT = r"require\s*\(\s*{var}\s*(?:[,)])"
 ASSERT_VAR_PATTERN_FMT = r"assert\s*\(\s*{var}\s*\)"
 IF_NOT_VAR_PATTERN_FMT = r"if\s*\(\s*!\s*{var}\s*\)"
@@ -597,6 +602,26 @@ def _detect_tx_gasprice_usage(
             )
 
 
+def _detect_assert_misuse(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    # assert() is for invariants that should never fail. Checks on caller input,
+    # sent value, or balances are business rules and belong in require().
+    for idx, line in enumerate(lines, start=1):
+        if ignore_next_lines and idx in ignore_next_lines:
+            continue
+        match = ASSERT_CALL_PATTERN.search(_without_line_comment(line))
+        if match and USER_INPUT_PATTERN.search(match.group("expr")):
+            yield Finding(
+                file_path=file_path,
+                line_number=idx,
+                code="A011",
+                severity="LOW",
+                message="assert() checks caller input or balances; use require() instead.",
+                line_text=line.rstrip(),
+            )
+
+
 def scan_paths(paths: Iterable[str]) -> list[Finding]:
     root_paths = [Path(p).resolve() for p in paths]
     findings: list[Finding] = []
@@ -623,5 +648,6 @@ def scan_paths(paths: Iterable[str]) -> list[Finding]:
         findings.extend(_detect_reentrancy_prone_calls(lines, file_path, ignore_next_lines))
         findings.extend(_detect_missing_access_control(lines, file_path, ignore_next_lines))
         findings.extend(_detect_tx_gasprice_usage(lines, file_path, ignore_next_lines))
+        findings.extend(_detect_assert_misuse(lines, file_path, ignore_next_lines))
     return findings
 
