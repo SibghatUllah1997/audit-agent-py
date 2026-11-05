@@ -1,0 +1,89 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "sibaudit: scan workspace (text)",
+      "type": "shell",
+      "command": "python3",
+      "args": [
+        "-m",
+        "sibaudit",
+        "${workspaceFolder}"
+      ],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": [
+        {
+          "owner": "sibaudit",
+          "source": "sibaudit",
+          "severity": "warning",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "pattern": {
+            "regexp": "^(.+?):(\\d+): (A\\d{3}) (.+)$",
+            "file": 1,
+            "line": 2,
+            "code": 3,
+            "message": 4
+          }
+        }
+      ]
+    },
+    {
+      "label": "sibaudit: scan current file (text)",
+      "type": "shell",
+      "command": "python3",
+      "args": [
+        "-m",
+        "sibaudit",
+        "${file}"
+      ],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": [
+        {
+          "owner": "sibaudit",
+          "source": "sibaudit",
+          "severity": "warning",
+          "fileLocation": [
+            "autoDetect",
+            "${workspaceFolder}"
+          ],
+          "pattern": {
+            "regexp": "^(.+?):(\\d+): (A\\d{3}) (.+)$",
+            "file": 1,
+            "line": 2,
+            "code": 3,
+            "message": 4
+          }
+        }
+      ]
+    },
+    {
+      "label": "sibaudit: scan workspace (json)",
+      "type": "shell",
+      "command": "python3",
+      "args": [
+        "-m",
+        "sibaudit",
+        "--format",
+        "json",
+        "${workspaceFolder}"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": []
+    }
+  ]
+}
