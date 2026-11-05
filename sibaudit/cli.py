@@ -4,6 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from .baseline import BaselineError, apply_baseline, load_baseline
 from .scanner import scan_paths
 
 
@@ -38,12 +39,27 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         metavar="GLOB",
         help="Skip files matching this glob (repeatable); wins over --include.",
     )
+    parser.add_argument(
+        "--baseline",
+        metavar="FILE",
+        default=None,
+        help="JSON file of known findings to suppress (file, line, and rule code).",
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> None:
     ns = parse_args(sys.argv[1:] if argv is None else argv)
     findings = scan_paths(ns.paths, include=ns.include, exclude=ns.exclude)
+    if ns.baseline:
+        baseline_path = Path(ns.baseline)
+        try:
+            entries = load_baseline(baseline_path)
+        except BaselineError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            sys.exit(2)
+        root = Path.cwd().resolve()
+        findings = apply_baseline(findings, entries, root)
     if ns.format == "json":
         import json
 
