@@ -1,0 +1,9 @@
+name: Bug report
+description: Report a problem in sibaudit
+title: "[bug]: "
+labels: [bug]
+body:
+- type: textarea
+  attributes:
+    label: Description
+    description: What happened?
