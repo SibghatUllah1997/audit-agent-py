@@ -18,7 +18,7 @@
 - [x] Day 16: Configurable include/exclude globs
 - [x] Day 17: Baseline suppression file
 - [x] Day 18: Rich summary report with counts per rule
-- Day 19: VS Code task snippet examples
+- [x] Day 19: VS Code task snippet examples
 - Day 20: Add `pre-commit` sample config
 - Day 21: Add GitHub Action to annotate findings
 - Day 22: Add rule for dangerous `tx.origin` comparisons depth

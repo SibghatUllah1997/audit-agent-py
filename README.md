@@ -134,6 +134,24 @@ by severity
   MEDIUM  2
 ```
 
+Use it in VS Code
+
+`examples/vscode/tasks.json` has ready-made tasks. Copy it to `.vscode/tasks.json` in your project (or merge the entries into an existing file):
+
+- `sibaudit: scan workspace (text)` and `sibaudit: scan current file (text)` run the scanner and turn each finding into an entry in the Problems panel.
+- `sibaudit: scan workspace (json)` prints newline-delimited JSON in the terminal, with no editor diagnostics.
+
+Run one with "Tasks: Run Task" from the command palette. The text tasks use this problem matcher regex, which fits the `path:line: CODE message` output:
+
+```
+^(.+?):(\d+): (A\d{3}) (.+)$
+```
+
+- The counts summary at the end of the text output does not match, so it never shows up as a problem.
+- Findings appear as warnings. The CLI exits with 1 when it finds something, so the task is marked as failed; that is expected.
+- A test runs the real CLI and checks the example regex against its output, so the docs and the format stay in sync.
+- The tasks call `python3 -m sibaudit`, so install the package in the interpreter VS Code uses.
+
 Ignoring one line
 
 Add the following directive on a line to ignore the very next line (for all rules):

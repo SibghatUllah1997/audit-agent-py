@@ -4,6 +4,8 @@
 - Added a baseline file so known findings can be snapshotted and hidden on later scans.
 - Added a summary report that counts findings by rule and by severity.
 - Marked days 17 and 18 complete on the roadmap.
+- Added VS Code task examples with a problem matcher so findings show up in the Problems panel, plus a test that keeps the matcher in sync with the CLI output.
+- Documented the VS Code tasks and marked day 19 on the roadmap.
 
 ## 2026-11-04
 - Added repeatable `--include` and `--exclude` glob options to choose which files are scanned.
