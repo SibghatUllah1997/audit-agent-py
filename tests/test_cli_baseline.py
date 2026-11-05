@@ -65,3 +65,42 @@ def test_missing_baseline_exits_two(tmp_path: Path, capsys: pytest.CaptureFixtur
     assert failed.value.code == 2
     err = capsys.readouterr().err
     assert "not found" in err
+
+
+def test_write_baseline_snapshots_current_findings(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    sol = tmp_path / "Token.sol"
+    sol.write_text(RISKY)
+    out = tmp_path / "snap.json"
+
+    with pytest.raises(SystemExit) as first:
+        main([str(sol), "--write-baseline", str(out)])
+    assert first.value.code == 1
+    capsys.readouterr()
+    payload = json.loads(out.read_text())
+    assert payload["version"] == 1
+    assert payload["findings"]
+    assert all(item["code"] == "A001" for item in payload["findings"])
+
+    with pytest.raises(SystemExit) as second:
+        main([str(sol), "--baseline", str(out)])
+    assert second.value.code == 0
+    assert capsys.readouterr().out.strip() == ""
+
+
+def test_write_baseline_keeps_full_snapshot_when_filtering(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    sol = tmp_path / "Token.sol"
+    sol.write_text(RISKY)
+    old = tmp_path / "old.json"
+    old.write_text(dump_baseline(scan_paths([str(sol)]), Path.cwd().resolve()))
+    fresh = tmp_path / "nested" / "new.json"
+
+    with pytest.raises(SystemExit) as filtered:
+        main([str(sol), "--baseline", str(old), "--write-baseline", str(fresh)])
+    assert filtered.value.code == 0
+    capsys.readouterr()
+    written = json.loads(fresh.read_text())
+    assert written["findings"], "snapshot should include findings even when output is empty"
