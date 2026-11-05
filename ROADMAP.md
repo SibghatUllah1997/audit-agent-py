@@ -15,7 +15,7 @@
 - [x] Day 13: Add rule for `assert` misuse (business logic)
 - [x] Day 14: Add rule for events missing critical parameters
 - [x] Day 15: Add rule for `blockhash` misuse
-- Day 16: Configurable include/exclude globs
+- [x] Day 16: Configurable include/exclude globs
 - Day 17: Baseline suppression file
 - Day 18: Rich summary report with counts per rule
 - Day 19: VS Code task snippet examples

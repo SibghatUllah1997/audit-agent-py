@@ -84,6 +84,20 @@ Each line is a JSON object with:
 - `severity` (string: `LOW` | `MEDIUM` | `HIGH`)
 - `message` (string)
 
+Include and exclude files
+
+Use `--include` and `--exclude` (both repeatable) to pick which `.sol` files are scanned:
+
+```bash
+python3 -m sibaudit contracts --include 'src/*' --exclude 'Mock*.sol' --exclude 'lib/*'
+```
+
+- Globs match the path relative to the scanned folder, or any trailing part of it.
+  `Mock*.sol` matches `src/test/MockToken.sol`; `lib/*` matches `lib/dep/Dep.sol`.
+- `*` also matches `/`. A leading `**/` is optional.
+- With no `--include`, every file is included. `--exclude` always wins.
+- A file passed directly is matched by its name only.
+
 Ignoring one line
 
 Add the following directive on a line to ignore the very next line (for all rules):

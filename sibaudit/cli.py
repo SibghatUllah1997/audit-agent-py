@@ -24,12 +24,26 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         default="text",
         help="Output format: 'text' (default) or 'json' (newline-delimited JSON objects).",
     )
+    parser.add_argument(
+        "--include",
+        action="append",
+        default=[],
+        metavar="GLOB",
+        help="Only scan files matching this glob (repeatable), e.g. --include 'src/*'.",
+    )
+    parser.add_argument(
+        "--exclude",
+        action="append",
+        default=[],
+        metavar="GLOB",
+        help="Skip files matching this glob (repeatable); wins over --include.",
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> None:
     ns = parse_args(sys.argv[1:] if argv is None else argv)
-    findings = scan_paths(ns.paths)
+    findings = scan_paths(ns.paths, include=ns.include, exclude=ns.exclude)
     if ns.format == "json":
         import json
 
