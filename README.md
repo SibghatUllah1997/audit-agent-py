@@ -66,7 +66,9 @@ Example output (real):
 ```
 
 Notes
-- Text output format is `path:line: CODE message`. Exit code is 1 when findings exist, else 0.
+- Text output format is `path:line: CODE message`, followed by a counts summary.
+- `--format summary` prints only the counts. `--format json` stays machine-readable (no summary footer).
+- Exit code is 1 when findings exist, else 0.
 
 JSON output
 
@@ -97,6 +99,40 @@ python3 -m sibaudit contracts --include 'src/*' --exclude 'Mock*.sol' --exclude 
 - `*` also matches `/`. A leading `**/` is optional.
 - With no `--include`, every file is included. `--exclude` always wins.
 - A file passed directly is matched by its name only.
+
+Baseline suppression
+
+Snapshot today's findings, then hide them on later scans so only new issues show up:
+
+```bash
+python3 -m sibaudit path/to/contracts --write-baseline .sibaudit-baseline.json
+python3 -m sibaudit path/to/contracts --baseline .sibaudit-baseline.json
+```
+
+- The file is JSON: `version` plus a `findings` list of `{file, line, code}`.
+- Paths are stored relative to the current working directory.
+- `--write-baseline` records the full current scan, even when `--baseline` is also set.
+- A missing or invalid baseline file exits with code 2.
+
+Summary report
+
+Text output ends with counts per rule and per severity. Use `--format summary` for the counts alone:
+
+```bash
+python3 -m sibaudit path/to/contracts --format summary
+```
+
+```
+3 findings
+
+by rule
+  A001  MEDIUM  2
+  A003  HIGH    1
+
+by severity
+  HIGH    1
+  MEDIUM  2
+```
 
 Ignoring one line
 
@@ -133,7 +169,8 @@ flowchart TD
     D --> E8[reentrancy heuristic]
     D --> E9[missing access control]
     E1 & E2 & E3 & E4 & E5 & E6 & E7 & E8 & E9 --> F[Findings list]
-    F -->|--format text/json| G[stdout + exit code]
+    F -->|optional baseline file| G[Suppress known issues]
+    G -->|--format text/json/summary| H[stdout + exit code]
 ```
 
 Roadmap
@@ -174,7 +211,9 @@ sibaudit path/to/contracts
 python3 -m sibaudit path/to/contracts
 ```
 
-Findings are printed in `path:line: CODE message` format. The CLI exits with code 1 if any findings are detected, otherwise 0.
+Findings are printed in `path:line: CODE message` format, followed by a short counts summary. Use `--format summary` for the counts only, or `--format json` for newline-delimited records. The CLI exits with code 1 if any findings are detected, otherwise 0.
+
+Pass `--write-baseline FILE` to snapshot the current findings as JSON, and `--baseline FILE` on later runs to hide those known issues.
 
 ### JSON output
 

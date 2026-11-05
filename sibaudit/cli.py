@@ -5,7 +5,8 @@ import sys
 from pathlib import Path
 
 from .baseline import BaselineError, apply_baseline, load_baseline, write_baseline
-from .scanner import scan_paths
+from .report import format_summary
+from .scanner import Finding, scan_paths
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -21,9 +22,9 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument(
         "--format",
-        choices=["text", "json"],
+        choices=["text", "json", "summary"],
         default="text",
-        help="Output format: 'text' (default) or 'json' (newline-delimited JSON objects).",
+        help="Output format: 'text' (default), 'json' (newline-delimited objects), or 'summary'.",
     )
     parser.add_argument(
         "--include",
@@ -69,7 +70,13 @@ def main(argv: list[str] | None = None) -> None:
         write_baseline(Path(ns.write_baseline), findings, root)
     if entries:
         findings = apply_baseline(findings, entries, root)
-    if ns.format == "json":
+    _print_findings(findings, ns.format)
+    # Exit non-zero if any findings
+    sys.exit(1 if findings else 0)
+
+
+def _print_findings(findings: list[Finding], fmt: str) -> None:
+    if fmt == "json":
         import json
 
         for f in findings:
@@ -81,10 +88,14 @@ def main(argv: list[str] | None = None) -> None:
                 "message": f.message,
             }
             print(json.dumps(record, ensure_ascii=False))
-    else:
-        for f in findings:
-            rel = str(Path(f.file_path))
-            print(f"{rel}:{f.line_number}: {f.code} {f.message}")
-    # Exit non-zero if any findings
-    sys.exit(1 if findings else 0)
+        return
+    if fmt == "summary":
+        print(format_summary(findings))
+        return
+    for f in findings:
+        rel = str(Path(f.file_path))
+        print(f"{rel}:{f.line_number}: {f.code} {f.message}")
+    if findings:
+        print()
+        print(format_summary(findings))
 

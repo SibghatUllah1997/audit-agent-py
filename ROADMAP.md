@@ -16,8 +16,8 @@
 - [x] Day 14: Add rule for events missing critical parameters
 - [x] Day 15: Add rule for `blockhash` misuse
 - [x] Day 16: Configurable include/exclude globs
-- Day 17: Baseline suppression file
-- Day 18: Rich summary report with counts per rule
+- [x] Day 17: Baseline suppression file
+- [x] Day 18: Rich summary report with counts per rule
 - Day 19: VS Code task snippet examples
 - Day 20: Add `pre-commit` sample config
 - Day 21: Add GitHub Action to annotate findings
