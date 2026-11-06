@@ -1,0 +1,15 @@
+# Lets other repositories run sibaudit through pre-commit:
+#   repos:
+#     - repo: https://github.com/SibghatUllah1997/audit-agent-py
+#       rev: <commit-sha>
+#       hooks:
+#         - id: sibaudit
+- id: sibaudit
+  name: sibaudit (Solidity heuristic scan)
+  description: Flag risky Solidity patterns (tx.origin, delegatecall, reentrancy, ...) in staged .sol files.
+  entry: sibaudit
+  language: python
+  types: [solidity]
+  # Each pre-commit batch prints its own summary footer; keep one batch so
+  # output is a single report and the counts are correct.
+  require_serial: true
