@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-11-06
+- Added a `.pre-commit-hooks.yaml` so other repositories can run sibaudit as a pre-commit hook on staged `.sol` files.
+- Added a sample `.pre-commit-config.yaml` under `examples/pre-commit/`, plus tests that validate both files with pre-commit's own schema.
+- CI now installs pre-commit so those tests run instead of being skipped.
+- Removed a stale second copy of the README that had been appended after the license section.
+- Documented the pre-commit hook and marked day 20 on the roadmap.
+
 ## 2026-11-05
 - Added a baseline file so known findings can be snapshotted and hidden on later scans.
 - Added a summary report that counts findings by rule and by severity.
