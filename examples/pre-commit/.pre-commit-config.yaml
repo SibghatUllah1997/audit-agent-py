@@ -1,0 +1,27 @@
+# Sample pre-commit config for a Solidity project.
+# Copy to the root of your repository, then run:
+#   pip install pre-commit
+#   pre-commit install
+#   pre-commit run --all-files
+repos:
+  # Option 1: pull the hook straight from GitHub (pre-commit manages the venv).
+  # Pin `rev` to a commit SHA (or a release tag once one exists). A branch name
+  # works but pre-commit warns that it is mutable.
+  - repo: https://github.com/SibghatUllah1997/audit-agent-py
+    rev: main
+    hooks:
+      - id: sibaudit
+        # Hide findings you have already triaged (see "Baseline suppression").
+        # args: [--baseline, .sibaudit-baseline.json]
+        # Skip vendored code and mocks.
+        # exclude: ^(lib|node_modules)/|Mock.*\.sol$
+
+  # Option 2: use a sibaudit already installed in your environment.
+  # - repo: local
+  #   hooks:
+  #     - id: sibaudit
+  #       name: sibaudit
+  #       entry: sibaudit
+  #       language: system
+  #       types: [solidity]
+  #       require_serial: true
