@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 from .baseline import BaselineError, apply_baseline, load_baseline, write_baseline
-from .report import format_summary
+from .report import format_github_annotations, format_summary
 from .scanner import Finding, scan_paths
 
 
@@ -22,9 +22,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument(
         "--format",
-        choices=["text", "json", "summary"],
+        choices=["text", "json", "summary", "github"],
         default="text",
-        help="Output format: 'text' (default), 'json' (newline-delimited objects), or 'summary'.",
+        help=(
+            "Output format: 'text' (default), 'json' (newline-delimited objects), "
+            "'summary', or 'github' (Actions workflow annotations)."
+        ),
     )
     parser.add_argument(
         "--include",
@@ -88,6 +91,11 @@ def _print_findings(findings: list[Finding], fmt: str) -> None:
                 "message": f.message,
             }
             print(json.dumps(record, ensure_ascii=False))
+        return
+    if fmt == "github":
+        text = format_github_annotations(findings)
+        if text:
+            print(text)
         return
     if fmt == "summary":
         print(format_summary(findings))

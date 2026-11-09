@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sibaudit.report import format_summary, summarize
+from sibaudit.report import (
+    format_github_annotations,
+    format_summary,
+    relative_display_path,
+    summarize,
+)
 from sibaudit.scanner import Finding
 
 
@@ -70,3 +75,68 @@ def test_unknown_severity_is_listed_last() -> None:
         ]
     )
     assert summary.by_severity == (("MEDIUM", 1), ("INFO", 1))
+
+
+def test_github_annotations_map_severity_and_relative_paths(tmp_path: Path) -> None:
+    sol = tmp_path / "Token.sol"
+    sol.write_text("//")
+    findings = [
+        Finding(
+            file_path=sol,
+            line_number=4,
+            code="A003",
+            severity="HIGH",
+            message="delegatecall",
+            line_text="//",
+        ),
+        Finding(
+            file_path=sol,
+            line_number=9,
+            code="A001",
+            severity="MEDIUM",
+            message="tx.origin",
+            line_text="//",
+        ),
+        Finding(
+            file_path=sol,
+            line_number=12,
+            code="A010",
+            severity="LOW",
+            message="gasprice",
+            line_text="//",
+        ),
+    ]
+    text = format_github_annotations(findings, cwd=tmp_path)
+    lines = text.splitlines()
+    assert lines[0] == "::error file=Token.sol,line=4,title=A003 (HIGH)::delegatecall"
+    assert lines[1] == "::warning file=Token.sol,line=9,title=A001 (MEDIUM)::tx.origin"
+    assert lines[2] == "::notice file=Token.sol,line=12,title=A010 (LOW)::gasprice"
+
+
+def test_github_annotations_escape_special_characters(tmp_path: Path) -> None:
+    sol = tmp_path / "C.sol"
+    sol.write_text("//")
+    finding = Finding(
+        file_path=sol,
+        line_number=3,
+        code="A001",
+        severity="MEDIUM",
+        message="100% bad: a, b\nand more",
+        line_text="//",
+    )
+    text = format_github_annotations([finding], cwd=tmp_path)
+    assert text.startswith("::warning file=C.sol,line=3,title=A001 (MEDIUM)::")
+    assert "100%25 bad: a, b%0Aand more" in text
+
+
+def test_github_annotations_empty() -> None:
+    assert format_github_annotations([]) == ""
+
+
+def test_relative_display_path_falls_back_outside_root(tmp_path: Path) -> None:
+    outside = tmp_path / "other" / "X.sol"
+    root = tmp_path / "workspace"
+    root.mkdir()
+    outside.parent.mkdir()
+    outside.write_text("//")
+    assert relative_display_path(outside, root) == outside.resolve().as_posix()

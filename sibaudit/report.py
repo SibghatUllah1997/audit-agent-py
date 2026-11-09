@@ -3,10 +3,12 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 
 from .scanner import Finding
 
 SEVERITY_ORDER = ("HIGH", "MEDIUM", "LOW")
+GITHUB_LEVEL = {"HIGH": "error", "MEDIUM": "warning", "LOW": "notice"}
 
 
 @dataclass(frozen=True)
@@ -69,4 +71,39 @@ def format_summary(findings: Sequence[Finding]) -> str:
     severity_count_width = max(len(str(count)) for _, count in summary.by_severity)
     for severity, count in summary.by_severity:
         lines.append(f"  {severity:<{label_width}}  {count:>{severity_count_width}}")
+    return "\n".join(lines)
+
+
+def _escape_github_data(value: str) -> str:
+    # Percent must be escaped first so later substitutions stay literal.
+    return value.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+
+
+def _escape_github_param(value: str) -> str:
+    return _escape_github_data(value).replace(":", "%3A").replace(",", "%2C")
+
+
+def relative_display_path(path: Path, root: Path) -> str:
+    """Return a workspace-relative POSIX path when `path` is under `root`."""
+    resolved = Path(path).resolve()
+    try:
+        return resolved.relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return resolved.as_posix()
+
+
+def format_github_annotations(
+    findings: Sequence[Finding], *, cwd: Path | None = None
+) -> str:
+    """Render GitHub Actions workflow commands so findings become file annotations."""
+    root = (cwd or Path.cwd()).resolve()
+    lines: list[str] = []
+    for finding in findings:
+        level = GITHUB_LEVEL.get(finding.severity, "warning")
+        file_param = _escape_github_param(relative_display_path(finding.file_path, root))
+        title = _escape_github_param(f"{finding.code} ({finding.severity})")
+        message = _escape_github_data(finding.message)
+        lines.append(
+            f"::{level} file={file_param},line={finding.line_number},title={title}::{message}"
+        )
     return "\n".join(lines)
