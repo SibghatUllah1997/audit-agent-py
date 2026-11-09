@@ -1,6 +1,9 @@
 # Changelog
 
 ## 2026-11-09
+- Added rule A015 to flag `address` variables that are declared without a value and never assigned, so they silently stay `address(0)`.
+- State variables count as set if any line in the file assigns them; locals only count assignments inside their own function.
+- Documented the code and marked day 23 on the roadmap.
 - Added `--format github` and a sample GitHub Action so findings show up as pull request annotations.
 - Added rule A014 to flag `tx.origin` used in authorization comparisons, including the phishing-prone `tx.origin == msg.sender` check.
 - Marked days 21 and 22 complete on the roadmap.

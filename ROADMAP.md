@@ -22,7 +22,7 @@
 - [x] Day 20: Add `pre-commit` sample config
 - [x] Day 21: Add GitHub Action to annotate findings
 - [x] Day 22: Add rule for dangerous `tx.origin` comparisons depth
-- Day 23: Add rule for uninitialized `address` variables
+- [x] Day 23: Add rule for uninitialized `address` variables
 - Day 24: Add rule for missing zero-address checks
 - Day 25: Add rule for magic numbers without constants
 - Day 26: Add rule for external calls in constructors
