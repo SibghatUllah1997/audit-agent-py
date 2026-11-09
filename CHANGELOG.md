@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-09
+- Added `--format github` and a sample GitHub Action so findings show up as pull request annotations.
+- Added rule A014 to flag `tx.origin` used in authorization comparisons, including the phishing-prone `tx.origin == msg.sender` check.
+- Marked days 21 and 22 complete on the roadmap.
+
 ## 2026-11-06
 - Added a `.pre-commit-hooks.yaml` so other repositories can run sibaudit as a pre-commit hook on staged `.sol` files.
 - Added a sample `.pre-commit-config.yaml` under `examples/pre-commit/`, plus tests that validate both files with pre-commit's own schema.

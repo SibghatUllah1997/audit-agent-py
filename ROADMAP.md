@@ -20,8 +20,8 @@
 - [x] Day 18: Rich summary report with counts per rule
 - [x] Day 19: VS Code task snippet examples
 - [x] Day 20: Add `pre-commit` sample config
-- Day 21: Add GitHub Action to annotate findings
-- Day 22: Add rule for dangerous `tx.origin` comparisons depth
+- [x] Day 21: Add GitHub Action to annotate findings
+- [x] Day 22: Add rule for dangerous `tx.origin` comparisons depth
 - Day 23: Add rule for uninitialized `address` variables
 - Day 24: Add rule for missing zero-address checks
 - Day 25: Add rule for magic numbers without constants
