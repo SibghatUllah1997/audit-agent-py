@@ -137,6 +137,15 @@ USER_INPUT_PATTERN = re.compile(
     r"\bmsg\.(?:sender|value|data)\b|\btx\.origin\b|\.balance\b|\bbalanceOf\s*\("
 )
 
+ADDRESS_DECL_NO_INIT_PATTERN = re.compile(
+    r"^\s*address(?:\s+payable)?"
+    r"(?:\s+(?:public|private|internal|immutable|override))*"
+    r"\s+(?P<name>[A-Za-z_]\w*)\s*;"
+)
+STRUCT_START_PATTERN = re.compile(r"\bstruct\s+[A-Za-z_]\w*\s*\{")
+ASSIGN_TARGET_FMT = r"\b{name}\b(?:\s*\[[^\]]*\])*\s*(?::=|=(?!=))"
+TUPLE_ASSIGN_FMT = r"\([^()]*\b{name}\b[^()]*\)\s*=(?!=)"
+
 REQUIRE_VAR_PATTERN_FMT = r"require\s*\(\s*{var}\s*(?:[,)])"
 ASSERT_VAR_PATTERN_FMT = r"assert\s*\(\s*{var}\s*\)"
 IF_NOT_VAR_PATTERN_FMT = r"if\s*\(\s*!\s*{var}\s*\)"
@@ -748,6 +757,67 @@ def _detect_assert_misuse(
             )
 
 
+def _struct_body_lines(lines: list[str]) -> set[int]:
+    # Struct members are field layouts, not variables, so they are never "assigned".
+    inside: set[int] = set()
+    depth = 0
+    for idx, line in enumerate(lines, start=1):
+        code = _without_line_comment(line)
+        if depth == 0 and STRUCT_START_PATTERN.search(code):
+            depth = code.count("{") - code.count("}")
+            continue
+        if depth > 0:
+            inside.add(idx)
+            depth += code.count("{") - code.count("}")
+    return inside
+
+
+def _is_assigned(name: str, lines: list[str], start: int, end: int, skip: int) -> bool:
+    assign = re.compile(ASSIGN_TARGET_FMT.format(name=re.escape(name)))
+    tuple_assign = re.compile(TUPLE_ASSIGN_FMT.format(name=re.escape(name)))
+    for lineno in range(start, end + 1):
+        if lineno == skip:
+            continue
+        code = _without_line_comment(lines[lineno - 1])
+        if assign.search(code) or tuple_assign.search(code):
+            return True
+    return False
+
+
+def _detect_uninitialized_address(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    # An address declared without a value and never assigned stays address(0).
+    # State variables are searched across the whole file (constructor, setters);
+    # locals only inside their own function.
+    struct_lines = _struct_body_lines(lines)
+    functions = list(_iter_functions(lines))
+    for idx, line in enumerate(lines, start=1):
+        if ignore_next_lines and idx in ignore_next_lines:
+            continue
+        if idx in struct_lines:
+            continue
+        match = ADDRESS_DECL_NO_INIT_PATTERN.match(_without_line_comment(line))
+        if not match:
+            continue
+        name = match.group("name")
+        owner_func = next((f for f in functions if f.start_line <= idx <= f.end_line), None)
+        if owner_func is None:
+            start, end, kind = 1, len(lines), "State"
+        else:
+            start, end, kind = owner_func.start_line, owner_func.end_line, "Local"
+        if _is_assigned(name, lines, start, end, skip=idx):
+            continue
+        yield Finding(
+            file_path=file_path,
+            line_number=idx,
+            code="A015",
+            severity="MEDIUM",
+            message=f'{kind} address "{name}" is never assigned and stays address(0).',
+            line_text=line.rstrip(),
+        )
+
+
 def scan_paths(
     paths: Iterable[str],
     include: Sequence[str] | None = None,
@@ -782,5 +852,6 @@ def scan_paths(
         findings.extend(_detect_assert_misuse(lines, file_path, ignore_next_lines))
         findings.extend(_detect_events_missing_critical_params(lines, file_path, ignore_next_lines))
         findings.extend(_detect_blockhash_misuse(lines, file_path, ignore_next_lines))
+        findings.extend(_detect_uninitialized_address(lines, file_path, ignore_next_lines))
     return findings
 
