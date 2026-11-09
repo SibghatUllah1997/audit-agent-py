@@ -27,6 +27,7 @@ Rules
 | A012 | LOW      | Event missing a critical amount or address parameter |
 | A013 | MEDIUM   | `blockhash` used as randomness or on the current block |
 | A014 | HIGH     | `tx.origin` used in an authorization comparison |
+| A015 | MEDIUM   | `address` variable declared without a value and never assigned |
 
 Install
 - Python 3.11+
