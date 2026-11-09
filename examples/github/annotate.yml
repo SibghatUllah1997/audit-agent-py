@@ -1,0 +1,29 @@
+# Copy this file to .github/workflows/sibaudit.yml in a Solidity project.
+# Findings are printed as workflow commands and show up as inline annotations
+# on pull requests. The job fails when the scan reports anything.
+name: sibaudit
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install sibaudit
+        run: |
+          python -m pip install --upgrade pip
+          pip install sibaudit
+
+      - name: Scan Solidity files
+        run: python3 -m sibaudit --format github .
