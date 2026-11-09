@@ -152,6 +152,30 @@ Run one with "Tasks: Run Task" from the command palette. The text tasks use this
 - A test runs the real CLI and checks the example regex against its output, so the docs and the format stay in sync.
 - The tasks call `python3 -m sibaudit`, so install the package in the interpreter VS Code uses.
 
+Use it with pre-commit
+
+This repository ships a `.pre-commit-hooks.yaml`, so any Solidity project can run sibaudit on staged `.sol` files before each commit. Add this to `.pre-commit-config.yaml` (a fuller sample is in `examples/pre-commit/.pre-commit-config.yaml`):
+
+```yaml
+repos:
+  - repo: https://github.com/SibghatUllah1997/audit-agent-py
+    rev: <commit-sha>
+    hooks:
+      - id: sibaudit
+        # args: [--baseline, .sibaudit-baseline.json]
+```
+
+```bash
+pip install pre-commit
+pre-commit install
+pre-commit run --all-files
+```
+
+- The hook only runs on files `pre-commit` tags as Solidity, and only on the files in the commit.
+- Any finding makes the hook fail and blocks the commit. Use `--baseline` to accept findings you have already triaged, or `// sibaudit:ignore-next-line` for a single line.
+- Pin `rev` to a commit SHA. A branch name works but `pre-commit` warns that it is mutable.
+- Already installed sibaudit? The sample also shows a `repo: local` hook with `language: system`.
+
 Ignoring one line
 
 Add the following directive on a line to ignore the very next line (for all rules):
@@ -194,93 +218,11 @@ flowchart TD
 Roadmap
 - See `ROADMAP.md`.
 
+What this is (and isn't)
+- An educational heuristic scanner, not a full static analyzer.
+- Rules are intentionally simple pattern checks, so expect false positives and misses.
+- Always verify results manually, and use professional tools and reviews for real security work.
+
 License
 
 MIT © 2026 HM Sibghat Ullah
-# Sibghat's Solidity Audit Helper
-
-A tiny, educational Python CLI that scans Solidity (`.sol`) files for a few well-known risky patterns:
-
-- Use of `tx.origin` (often misused for authentication)
-- Unchecked low-level calls (e.g., `address.call(...)`) where the success value is not obviously verified
-- Use of `delegatecall`
-- Use of `selfdestruct` / `suicide`
-- Use of `block.timestamp` / `now`
-- Unchecked arithmetic in pre-0.8 Solidity
-- External calls that happen before a later storage write (reentrancy-prone)
-- Privileged functions that appear to lack access control
-
-This is an intentionally minimal, static checker to bootstrap a daily portfolio project.
-
-## Quickstart
-
-1) Ensure Python 3.11+
-2) Install in editable mode:
-
-```bash
-python3 -m pip install -e .
-```
-
-3) Run against a file or directory:
-
-```bash
-sibaudit path/to/contracts
-# or
-python3 -m sibaudit path/to/contracts
-```
-
-Findings are printed in `path:line: CODE message` format, followed by a short counts summary. Use `--format summary` for the counts only, or `--format json` for newline-delimited records. The CLI exits with code 1 if any findings are detected, otherwise 0.
-
-Pass `--write-baseline FILE` to snapshot the current findings as JSON, and `--baseline FILE` on later runs to hide those known issues.
-
-### JSON output
-
-You can emit newline-delimited JSON records instead of text:
-
-```bash
-python3 -m sibaudit --format json path/to/contracts > findings.ndjson
-```
-
-Each line is a JSON object with:
-
-- `file_path` (string)
-- `line_number` (int)
-- `code` (string, e.g. `A001`)
-- `severity` (string: `LOW` | `MEDIUM` | `HIGH`)
-- `message` (string)
-
-### Ignoring one line
-
-Add the following directive on a line to ignore the very next line (for all rules):
-
-```solidity
-// sibaudit:ignore-next-line
-address a = tx.origin; // this line will be ignored
-```
-
-## Severities and rule codes
-
-- A001 (MEDIUM): Potential risky use of `tx.origin`
-- A002 (MEDIUM): Low-level call without capturing/validating success (heuristic)
-- A003 (HIGH): Use of `delegatecall` detected (dangerous; review proxy usage carefully)
-- A004 (HIGH): Use of `selfdestruct`/`suicide` detected (can brick contracts)
-- A005 (LOW): State variable shadowing by a parameter or local variable (heuristic)
-- A006 (MEDIUM): Use of `block.timestamp` / `now` (time can be manipulated slightly)
-- A007 (MEDIUM): Unchecked arithmetic in pre-0.8 Solidity (overflow/underflow risk)
-- A008 (HIGH): External call before a later state update (reentrancy heuristic)
-- A009 (HIGH): Sensitive function that appears to lack access control (heuristic)
-- A010 (LOW): Logic relies on `tx.gasprice`, which the sender controls
-- A011 (LOW): `assert` checks caller input or balances; prefer `require`
-- A012 (LOW): Event missing a critical amount or address parameter
-- A013 (MEDIUM): `blockhash` is miner-influenceable; current-block hash is always zero
-
-## What this is (and isn’t)
-
-- This is an educational toy, not a full static analyzer.
-- Rules are intentionally naive heuristics to keep things approachable.
-- You should always verify results manually and consult professional tools and reviews for any real security work.
-
-## License
-
-MIT — Copyright (c) 2026 HM Sibghat Ullah
-
