@@ -14,6 +14,12 @@ contract Vulnerable {
         a; // silence warning
     }
 
+    // tx.origin used as an authorization comparison
+    function onlyOrigin() external {
+        // A001 + A014
+        require(tx.origin == owner);
+    }
+
     // delegatecall without checks
     function run(address target, bytes calldata data) external {
         // A002 + A003

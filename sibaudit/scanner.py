@@ -9,6 +9,12 @@ from .globs import is_selected
 
 # Basic risky patterns
 TX_ORIGIN_PATTERN = re.compile(r"\btx\.origin\b")
+TX_ORIGIN_COMPARE_PATTERN = re.compile(
+    r"tx\.origin\s*(?:==|!=)|(?:==|!=)\s*tx\.origin"
+)
+TX_ORIGIN_VS_SENDER_PATTERN = re.compile(
+    r"tx\.origin\s*(?:==|!=)\s*msg\.sender|msg\.sender\s*(?:==|!=)\s*tx\.origin"
+)
 LOW_LEVEL_CALL_PATTERN = re.compile(
     r"\.(?:call|delegatecall|staticcall|callcode)\s*\(", re.IGNORECASE
 )
@@ -282,6 +288,35 @@ def _detect_tx_origin(
                 message="Potential risky use of tx.origin (often unsafe for auth).",
                 line_text=line.rstrip(),
             )
+
+
+def _detect_tx_origin_auth_comparison(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    # Deeper than A001: equality checks are how tx.origin is used as auth,
+    # including the phishing-prone "tx.origin == msg.sender" EOA-only guard.
+    for idx, line in enumerate(lines, start=1):
+        if ignore_next_lines and idx in ignore_next_lines:
+            continue
+        code = _without_line_comment(line)
+        if not TX_ORIGIN_COMPARE_PATTERN.search(code):
+            continue
+        if TX_ORIGIN_VS_SENDER_PATTERN.search(code):
+            message = (
+                "tx.origin == msg.sender does not stop phishing; "
+                "a malicious contract can still relay the call."
+            )
+        else:
+            message = "tx.origin used in an authorization comparison; prefer msg.sender."
+        yield Finding(
+            file_path=file_path,
+            line_number=idx,
+            code="A014",
+            severity="HIGH",
+            message=message,
+            line_text=line.rstrip(),
+        )
+
 
 def _is_pre_0_8_solidity(lines: list[str]) -> bool:
     pragma_re = re.compile(r"^\s*pragma\s+solidity\s+([^;]+);", re.IGNORECASE)
@@ -734,6 +769,7 @@ def scan_paths(
                 ignore_next_lines.add(idx + 1)
 
         findings.extend(_detect_tx_origin(lines, file_path, ignore_next_lines))
+        findings.extend(_detect_tx_origin_auth_comparison(lines, file_path, ignore_next_lines))
         findings.extend(_detect_unchecked_low_level_call(lines, file_path, ignore_next_lines))
         findings.extend(_detect_delegatecall_usage(lines, file_path, ignore_next_lines))
         findings.extend(_detect_selfdestruct_or_suicide(lines, file_path, ignore_next_lines))
