@@ -26,6 +26,7 @@ Rules
 | A011 | LOW      | `assert` used on caller input or balances (use `require`) |
 | A012 | LOW      | Event missing a critical amount or address parameter |
 | A013 | MEDIUM   | `blockhash` used as randomness or on the current block |
+| A014 | HIGH     | `tx.origin` used in an authorization comparison |
 
 Install
 - Python 3.11+
@@ -48,6 +49,7 @@ Example output (real):
 
 ```
 /workspace/examples/Vulnerable.sol:13: A001 Potential risky use of tx.origin (often unsafe for auth).
+/workspace/examples/Vulnerable.sol:20: A014 tx.origin used in an authorization comparison; prefer msg.sender.
 /workspace/examples/Vulnerable.sol:12: A002 Low-level call without capturing/validating success (heuristic).
 /workspace/examples/Vulnerable.sol:20: A002 Low-level call without capturing/validating success (heuristic).
 /workspace/examples/Vulnerable.sol:20: A003 Use of delegatecall detected; review proxy pattern and calldata handling.
@@ -68,6 +70,7 @@ Example output (real):
 Notes
 - Text output format is `path:line: CODE message`, followed by a counts summary.
 - `--format summary` prints only the counts. `--format json` stays machine-readable (no summary footer).
+- `--format github` prints GitHub Actions workflow commands so findings become inline annotations.
 - Exit code is 1 when findings exist, else 0.
 
 JSON output
@@ -176,6 +179,26 @@ pre-commit run --all-files
 - Pin `rev` to a commit SHA. A branch name works but `pre-commit` warns that it is mutable.
 - Already installed sibaudit? The sample also shows a `repo: local` hook with `language: system`.
 
+GitHub annotations
+
+`--format github` prints one workflow command per finding. HIGH maps to `error`, MEDIUM to `warning`, and LOW to `notice`. Paths are workspace-relative when possible. There is no counts footer.
+
+```bash
+python3 -m sibaudit --format github path/to/contracts
+```
+
+```
+::warning file=Token.sol,line=7,title=A001 (MEDIUM)::Potential risky use of tx.origin (often unsafe for auth).
+```
+
+Use it as a GitHub Action
+
+`examples/github/annotate.yml` is a ready-made workflow. Copy it to `.github/workflows/sibaudit.yml` in a Solidity project:
+
+- It installs `sibaudit`, scans `.` with `--format github`, and fails the job when findings exist.
+- Annotations still show on the pull request when the step fails.
+- Change the scan path if contracts do not live at the repo root.
+
 Ignoring one line
 
 Add the following directive on a line to ignore the very next line (for all rules):
@@ -212,7 +235,7 @@ flowchart TD
     D --> E9[missing access control]
     E1 & E2 & E3 & E4 & E5 & E6 & E7 & E8 & E9 --> F[Findings list]
     F -->|optional baseline file| G[Suppress known issues]
-    G -->|--format text/json/summary| H[stdout + exit code]
+    G -->|--format text/json/summary/github| H[stdout + exit code]
 ```
 
 Roadmap
