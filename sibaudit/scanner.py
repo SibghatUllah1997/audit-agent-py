@@ -1042,7 +1042,7 @@ def _external_call_kind(code: str, typed_names: set[str]) -> str | None:
     """Describe the external call on `code`, or None if it has none."""
     low_level = CTOR_LOW_LEVEL_CALL_PATTERN.search(code)
     if low_level:
-        return f".{low_level.group('method')}() call"
+        return f"call via .{low_level.group('method')}()"
     if CTOR_THIS_CALL_PATTERN.search(code):
         return "call through this (no code is deployed yet)"
     for match in CTOR_CAST_CALL_PATTERN.finditer(code):

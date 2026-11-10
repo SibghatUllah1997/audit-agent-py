@@ -23,7 +23,7 @@ def test_flags_low_level_call_in_constructor(tmp_path: Path) -> None:
     findings = _scan(tmp_path, body)
     assert len(findings) == 1
     assert findings[0].severity == "MEDIUM"
-    assert ".call() call" in findings[0].message
+    assert "call via .call()" in findings[0].message
     assert "hook.call" in findings[0].line_text
 
 
