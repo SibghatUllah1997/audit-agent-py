@@ -180,6 +180,22 @@ ENUM_START_PATTERN = re.compile(r"\benum\s+[A-Za-z_]\w*\s*\{")
 PRAGMA_OR_IMPORT_PATTERN = re.compile(r"^\s*(?:pragma|import)\b", re.IGNORECASE)
 TRIVIAL_NUMBER_VALUES = frozenset({0, 1})
 
+CTOR_LOW_LEVEL_CALL_PATTERN = re.compile(
+    r"\.(?P<method>call|delegatecall|staticcall|transfer|send)\s*(?:\{[^}]*\})?\s*\(",
+    re.IGNORECASE,
+)
+CTOR_CAST_CALL_PATTERN = re.compile(
+    r"\b(?P<type>[A-Z]\w*)\s*\([^()]*(?:\([^()]*\)[^()]*)*\)\s*\.\s*[A-Za-z_]\w*\s*"
+    r"(?:\{[^}]*\})?\s*\("
+)
+CTOR_THIS_CALL_PATTERN = re.compile(r"\bthis\s*\.\s*[A-Za-z_]\w*\s*\(")
+CONTRACT_TYPED_NAME_PATTERN = re.compile(
+    r"\b(?P<type>[A-Z]\w*)(?:\s+(?:public|private|internal|immutable|memory|calldata|storage))*"
+    r"\s+(?P<name>[A-Za-z_]\w*)\s*(?=[,;)=])"
+)
+MEMBER_CALL_FMT = r"(?<![\w.]){name}\s*\.\s*[A-Za-z_]\w*\s*(?:\{{[^}}]*\}})?\s*\("
+NON_CONTRACT_TYPES = frozenset({"Error", "Panic"})
+
 REQUIRE_VAR_PATTERN_FMT = r"require\s*\(\s*{var}\s*(?:[,)])"
 ASSERT_VAR_PATTERN_FMT = r"assert\s*\(\s*{var}\s*\)"
 IF_NOT_VAR_PATTERN_FMT = r"if\s*\(\s*!\s*{var}\s*\)"
@@ -1000,6 +1016,79 @@ def _detect_missing_zero_address_check(
                 )
 
 
+def _contract_typed_names(text: str) -> set[str]:
+    """Names declared with a capitalized (contract or interface) type in `text`."""
+    names: set[str] = set()
+    for match in CONTRACT_TYPED_NAME_PATTERN.finditer(text):
+        if match.group("type") in NON_CONTRACT_TYPES:
+            continue
+        names.add(match.group("name"))
+    return names
+
+
+def _state_level_lines(lines: list[str]) -> list[str]:
+    """Lines outside any function or constructor body (state declarations)."""
+    inside: set[int] = set()
+    for func in _iter_functions(lines, include_constructors=True):
+        inside.update(range(func.start_line, func.end_line + 1))
+    return [
+        _without_line_comment(line)
+        for idx, line in enumerate(lines, start=1)
+        if idx not in inside
+    ]
+
+
+def _external_call_kind(code: str, typed_names: set[str]) -> str | None:
+    """Describe the external call on `code`, or None if it has none."""
+    low_level = CTOR_LOW_LEVEL_CALL_PATTERN.search(code)
+    if low_level:
+        return f"call via .{low_level.group('method')}()"
+    if CTOR_THIS_CALL_PATTERN.search(code):
+        return "call through this (no code is deployed yet)"
+    for match in CTOR_CAST_CALL_PATTERN.finditer(code):
+        if match.group("type") not in NON_CONTRACT_TYPES:
+            return f"call on {match.group('type')}(...)"  # cast-then-call, e.g. IERC20(t).x()
+    for name in sorted(typed_names):
+        if re.search(MEMBER_CALL_FMT.format(name=re.escape(name)), code):
+            return f'call on contract "{name}"'
+    return None
+
+
+def _detect_constructor_external_calls(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    # Calling out while the contract is half-built hands control to code that
+    # can re-enter or observe uninitialized state, and the address may be wrong.
+    state_names = _contract_typed_names("\n".join(_state_level_lines(lines)))
+    for func in _iter_functions(lines, include_constructors=True):
+        if func.name != "constructor":
+            continue
+        source = _function_source(lines, func)
+        typed_names = state_names | _contract_typed_names(source)
+        body_start = func.start_line
+        for lineno in range(func.start_line, func.end_line + 1):
+            if "{" in _without_line_comment(lines[lineno - 1]):
+                body_start = lineno
+                break
+        for lineno in range(body_start, func.end_line + 1):
+            if ignore_next_lines and lineno in ignore_next_lines:
+                continue
+            code = _without_line_comment(lines[lineno - 1])
+            if lineno == body_start:
+                code = code.split("{", 1)[1]
+            kind = _external_call_kind(code, typed_names)
+            if kind is None:
+                continue
+            yield Finding(
+                file_path=file_path,
+                line_number=lineno,
+                code="A018",
+                severity="MEDIUM",
+                message=f"External {kind} inside a constructor; the contract is not fully set up.",
+                line_text=lines[lineno - 1].rstrip(),
+            )
+
+
 def scan_paths(
     paths: Iterable[str],
     include: Sequence[str] | None = None,
@@ -1037,5 +1126,6 @@ def scan_paths(
         findings.extend(_detect_uninitialized_address(lines, file_path, ignore_next_lines))
         findings.extend(_detect_missing_zero_address_check(lines, file_path, ignore_next_lines))
         findings.extend(_detect_magic_numbers(lines, file_path, ignore_next_lines))
+        findings.extend(_detect_constructor_external_calls(lines, file_path, ignore_next_lines))
     return findings
 

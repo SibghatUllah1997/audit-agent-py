@@ -91,5 +91,11 @@ contract Vulnerable {
         // A017
         return amount * 25 / 10000;
     }
-}
 
+    // constructor hands control to an outside contract before setup is done
+    constructor(address registry) {
+        // A018
+        (bool ok, ) = registry.call(abi.encodeWithSignature("register()"));
+        require(ok, "register failed");
+    }
+}

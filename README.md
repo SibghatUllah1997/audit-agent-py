@@ -30,6 +30,7 @@ Rules
 | A015 | MEDIUM   | `address` variable declared without a value and never assigned |
 | A016 | MEDIUM   | Address parameter stored without a zero-address check |
 | A017 | LOW      | Numeric literal that is not a named constant |
+| A018 | MEDIUM   | External call made inside a constructor |
 
 Install
 - Python 3.11+
@@ -70,6 +71,7 @@ Example output (real):
 /workspace/examples/Vulnerable.sol:56: A009 Sensitive function appears to lack access control (heuristic).
 /workspace/examples/Vulnerable.sol:86: A016 Address parameter "newTreasury" is stored without a zero-address check.
 /workspace/examples/Vulnerable.sol:92: A017 Magic numbers 25, 10000 are not named constants.
+/workspace/examples/Vulnerable.sol:98: A018 External call via .call() inside a constructor; the contract is not fully set up.
 ```
 
 Notes
