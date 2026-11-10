@@ -77,5 +77,19 @@ contract Vulnerable {
         // A013
         return uint256(blockhash(block.number));
     }
+
+    // address parameter stored without an address(0) guard
+    address public treasury;
+
+    function setTreasury(address newTreasury) external {
+        // A016
+        treasury = newTreasury;
+    }
+
+    // fee math uses unnamed numeric literals
+    function feeOn(uint256 amount) external pure returns (uint256) {
+        // A017
+        return amount * 25 / 10000;
+    }
 }
 
