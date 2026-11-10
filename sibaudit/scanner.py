@@ -33,7 +33,9 @@ EXTERNAL_INTERACTION_PATTERN = re.compile(
     r"\.(?:call|delegatecall|callcode|transfer|send)\s*(?:\{[^}]*\})?\s*\(",
     re.IGNORECASE,
 )
-FUNC_START_PATTERN = re.compile(r"\bfunction\s+([A-Za-z_]\w*)\s*\(")
+CALLABLE_START_PATTERN = re.compile(
+    r"\b(?:function\s+(?P<func>[A-Za-z_]\w*)|(?P<ctor>constructor))\s*\("
+)
 VISIBILITY_PATTERN = re.compile(r"\b(external|public|internal|private)\b")
 VIEW_PURE_PATTERN = re.compile(r"\b(?:view|pure)\b")
 TYPE_DECL_HEAD_PATTERN = re.compile(
@@ -217,15 +219,17 @@ def _without_line_comment(line: str) -> str:
     return line
 
 
-def _iter_functions(lines: list[str]) -> Iterator[_FunctionInfo]:
+def _iter_functions(
+    lines: list[str], *, include_constructors: bool = False
+) -> Iterator[_FunctionInfo]:
     n = len(lines)
     i = 0
     while i < n:
-        match = FUNC_START_PATTERN.search(_without_line_comment(lines[i]))
+        match = CALLABLE_START_PATTERN.search(_without_line_comment(lines[i]))
         if not match:
             i += 1
             continue
-        name = match.group(1)
+        name = match.group("func") or "constructor"
         header_chunks: list[str] = []
         paren = 0
         seen_open_paren = False
@@ -278,15 +282,16 @@ def _iter_functions(lines: list[str]) -> Iterator[_FunctionInfo]:
         vis_match = VISIBILITY_PATTERN.search(header)
         after_params = header.split(")", 1)[-1].split("{", 1)[0]
         tokens = re.findall(r"[A-Za-z_]\w*", after_params)
-        yield _FunctionInfo(
-            name=name,
-            start_line=i + 1,
-            end_line=end_i + 1,
-            header=header,
-            visibility=vis_match.group(1) if vis_match else "",
-            modifiers=tuple(t for t in tokens if t not in HEADER_SKIP_TOKENS),
-            is_view_or_pure=bool(VIEW_PURE_PATTERN.search(header)),
-        )
+        if name != "constructor" or include_constructors:
+            yield _FunctionInfo(
+                name=name,
+                start_line=i + 1,
+                end_line=end_i + 1,
+                header=header,
+                visibility=vis_match.group(1) if vis_match else "",
+                modifiers=tuple(t for t in tokens if t not in HEADER_SKIP_TOKENS),
+                is_view_or_pure=bool(VIEW_PURE_PATTERN.search(header)),
+            )
         i = end_i + 1
 
 
@@ -880,7 +885,7 @@ def _detect_missing_zero_address_check(
 ) -> Iterator[Finding]:
     # Address parameters copied into storage without an address(0) guard can
     # permanently lock ownership, token, or treasury slots.
-    for func in _iter_functions(lines):
+    for func in _iter_functions(lines, include_constructors=True):
         if func.is_view_or_pure:
             continue
         params = _address_param_names(_callable_params(func.header))

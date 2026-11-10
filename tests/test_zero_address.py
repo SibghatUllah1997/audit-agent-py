@@ -134,6 +134,52 @@ def test_ignore_directive_skips_assignment(tmp_path: Path) -> None:
     assert not _scan(tmp_path, body)
 
 
+def test_flags_constructor_that_stores_address_without_check(tmp_path: Path) -> None:
+    (tmp_path / "C.sol").write_text(
+        "pragma solidity ^0.8.20;\n"
+        "contract C {\n"
+        "    address public admin;\n"
+        "    constructor(address admin_) {\n"
+        "        admin = admin_;\n"
+        "    }\n"
+        "}\n"
+    )
+    findings = [f for f in scan_paths([str(tmp_path)]) if f.code == "A016"]
+    assert len(findings) == 1
+    assert 'Address parameter "admin_"' in findings[0].message
+    assert "admin = admin_" in findings[0].line_text
+
+
+def test_allows_constructor_with_zero_check(tmp_path: Path) -> None:
+    (tmp_path / "C.sol").write_text(
+        "pragma solidity ^0.8.20;\n"
+        "contract C {\n"
+        "    address public admin;\n"
+        "    constructor(address admin_) {\n"
+        "        require(admin_ != address(0));\n"
+        "        admin = admin_;\n"
+        "    }\n"
+        "}\n"
+    )
+    findings = [f for f in scan_paths([str(tmp_path)]) if f.code == "A016"]
+    assert not findings
+
+
+def test_legacy_visibility_constructor_is_checked(tmp_path: Path) -> None:
+    (tmp_path / "C.sol").write_text(
+        "pragma solidity ^0.7.6;\n"
+        "contract C {\n"
+        "    address public token;\n"
+        "    constructor(address token_) public {\n"
+        "        token = token_;\n"
+        "    }\n"
+        "}\n"
+    )
+    findings = [f for f in scan_paths([str(tmp_path)]) if f.code == "A016"]
+    assert len(findings) == 1
+    assert "token = token_" in findings[0].line_text
+
+
 def test_comment_assignment_is_ignored(tmp_path: Path) -> None:
     body = (
         "address public owner;\n"
