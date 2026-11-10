@@ -23,8 +23,8 @@
 - [x] Day 21: Add GitHub Action to annotate findings
 - [x] Day 22: Add rule for dangerous `tx.origin` comparisons depth
 - [x] Day 23: Add rule for uninitialized `address` variables
-- Day 24: Add rule for missing zero-address checks
-- Day 25: Add rule for magic numbers without constants
+- [x] Day 24: Add rule for missing zero-address checks
+- [x] Day 25: Add rule for magic numbers without constants
 - Day 26: Add rule for external calls in constructors
 - Day 27: Add rule for payable functions w/o withdraw paths
 - Day 28: Add rule for incorrect `onlyOwner` patterns

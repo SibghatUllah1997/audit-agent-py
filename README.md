@@ -28,6 +28,8 @@ Rules
 | A013 | MEDIUM   | `blockhash` used as randomness or on the current block |
 | A014 | HIGH     | `tx.origin` used in an authorization comparison |
 | A015 | MEDIUM   | `address` variable declared without a value and never assigned |
+| A016 | MEDIUM   | Address parameter stored without a zero-address check |
+| A017 | LOW      | Numeric literal that is not a named constant |
 
 Install
 - Python 3.11+
@@ -66,6 +68,8 @@ Example output (real):
 /workspace/examples/Vulnerable.sol:24: A009 Sensitive function appears to lack access control (heuristic).
 /workspace/examples/Vulnerable.sol:36: A009 Sensitive function appears to lack access control (heuristic).
 /workspace/examples/Vulnerable.sol:56: A009 Sensitive function appears to lack access control (heuristic).
+/workspace/examples/Vulnerable.sol:86: A016 Address parameter "newTreasury" is stored without a zero-address check.
+/workspace/examples/Vulnerable.sol:92: A017 Magic numbers 25, 10000 are not named constants.
 ```
 
 Notes
@@ -234,7 +238,9 @@ flowchart TD
     D --> E7[pre-0.8 arithmetic]
     D --> E8[reentrancy heuristic]
     D --> E9[missing access control]
-    E1 & E2 & E3 & E4 & E5 & E6 & E7 & E8 & E9 --> F[Findings list]
+    D --> E10[zero-address check]
+    D --> E11[magic numbers]
+    E1 & E2 & E3 & E4 & E5 & E6 & E7 & E8 & E9 & E10 & E11 --> F[Findings list]
     F -->|optional baseline file| G[Suppress known issues]
     G -->|--format text/json/summary/github| H[stdout + exit code]
 ```

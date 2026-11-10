@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-10
+- Added rule A016 to flag address parameters written into storage without an `address(0)` check, including constructors.
+- Added rule A017 to flag numeric literals that are not named `constant` or `immutable` values.
+- Documented both codes and marked days 24 and 25 on the roadmap.
+
 ## 2026-11-09
 - Added rule A015 to flag `address` variables that are declared without a value and never assigned, so they silently stay `address(0)`.
 - State variables count as set if any line in the file assigns them; locals only count assignments inside their own function.
