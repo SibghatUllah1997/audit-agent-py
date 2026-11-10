@@ -31,3 +31,8 @@ def test_sample_contract_flags_zero_address_and_magic_numbers() -> None:
     assert any(
         f.code == "A017" and "25" in f.line_text and "10000" in f.line_text for f in findings
     )
+
+
+def test_sample_contract_flags_constructor_external_call() -> None:
+    findings = scan_paths([str(EXAMPLES)])
+    assert any(f.code == "A018" and "registry.call" in f.line_text for f in findings)
