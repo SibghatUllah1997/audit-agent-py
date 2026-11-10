@@ -146,6 +146,28 @@ STRUCT_START_PATTERN = re.compile(r"\bstruct\s+[A-Za-z_]\w*\s*\{")
 ASSIGN_TARGET_FMT = r"\b{name}\b(?:\s*\[[^\]]*\])*\s*(?::=|=(?!=))"
 TUPLE_ASSIGN_FMT = r"\([^()]*\b{name}\b[^()]*\)\s*=(?!=)"
 
+ADDRESS_PARAM_NAME_PATTERN = re.compile(
+    r"\baddress(?:\s+payable)?(?!\s*\[)"
+    r"(?:\s+(?:memory|calldata|storage))?"
+    r"\s+(?P<name>[A-Za-z_]\w*)",
+    re.IGNORECASE,
+)
+LOCAL_ADDRESS_DECL_PATTERN = re.compile(
+    r"\baddress(?:\s+payable)?(?:\s+(?:memory|calldata|storage))?"
+    r"\s+(?P<name>[A-Za-z_]\w*)",
+    re.IGNORECASE,
+)
+ZERO_ADDRESS_CHECK_FMT = (
+    r"(?:"
+    r"{name}\s*(?:!=|==)\s*address\s*\(\s*0(?:x0+)?\s*\)"
+    r"|address\s*\(\s*0(?:x0+)?\s*\)\s*(?:!=|==)\s*{name}"
+    r")"
+)
+STORE_PARAM_FMT = (
+    r"\b(?P<lhs>[A-Za-z_]\w*)\s*=(?!=)\s*"
+    r"(?:(?:payable|address|[A-Z][A-Za-z0-9_]*)\s*\(\s*)?{name}\b"
+)
+
 REQUIRE_VAR_PATTERN_FMT = r"require\s*\(\s*{var}\s*(?:[,)])"
 ASSERT_VAR_PATTERN_FMT = r"assert\s*\(\s*{var}\s*\)"
 IF_NOT_VAR_PATTERN_FMT = r"if\s*\(\s*!\s*{var}\s*\)"
@@ -818,6 +840,80 @@ def _detect_uninitialized_address(
         )
 
 
+def _callable_params(header: str) -> str:
+    """Return the parameter list inside the first parenthesized group of `header`."""
+    start = header.find("(")
+    if start < 0:
+        return ""
+    depth = 0
+    for index, char in enumerate(header[start:], start=start):
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+            if depth == 0:
+                return header[start + 1 : index]
+    return ""
+
+
+def _address_param_names(params: str) -> tuple[str, ...]:
+    """Address argument names from a Solidity parameter list."""
+    return tuple(match.group("name") for match in ADDRESS_PARAM_NAME_PATTERN.finditer(params))
+
+
+def _has_zero_address_check(body: str, name: str) -> bool:
+    """True if `name` is compared to address(0) anywhere in `body`."""
+    pattern = re.compile(ZERO_ADDRESS_CHECK_FMT.format(name=re.escape(name)), re.IGNORECASE)
+    return bool(pattern.search(body))
+
+
+def _function_source(lines: list[str], func: _FunctionInfo) -> str:
+    """Join a function header and body with line comments stripped."""
+    return "\n".join(
+        _without_line_comment(lines[index])
+        for index in range(func.start_line - 1, func.end_line)
+    )
+
+
+def _detect_missing_zero_address_check(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    # Address parameters copied into storage without an address(0) guard can
+    # permanently lock ownership, token, or treasury slots.
+    for func in _iter_functions(lines):
+        if func.is_view_or_pure:
+            continue
+        params = _address_param_names(_callable_params(func.header))
+        if not params:
+            continue
+        body = _function_source(lines, func)
+        local_names = {match.group("name") for match in LOCAL_ADDRESS_DECL_PATTERN.finditer(body)}
+        for name in params:
+            if _has_zero_address_check(body, name):
+                continue
+            store = re.compile(STORE_PARAM_FMT.format(name=re.escape(name)))
+            for lineno in range(func.start_line, func.end_line + 1):
+                if ignore_next_lines and lineno in ignore_next_lines:
+                    continue
+                code = _without_line_comment(lines[lineno - 1])
+                match = store.search(code)
+                if not match:
+                    continue
+                lhs = match.group("lhs")
+                if lhs == name or lhs in local_names:
+                    continue
+                yield Finding(
+                    file_path=file_path,
+                    line_number=lineno,
+                    code="A016",
+                    severity="MEDIUM",
+                    message=(
+                        f'Address parameter "{name}" is stored without a zero-address check.'
+                    ),
+                    line_text=lines[lineno - 1].rstrip(),
+                )
+
+
 def scan_paths(
     paths: Iterable[str],
     include: Sequence[str] | None = None,
@@ -853,5 +949,6 @@ def scan_paths(
         findings.extend(_detect_events_missing_critical_params(lines, file_path, ignore_next_lines))
         findings.extend(_detect_blockhash_misuse(lines, file_path, ignore_next_lines))
         findings.extend(_detect_uninitialized_address(lines, file_path, ignore_next_lines))
+        findings.extend(_detect_missing_zero_address_check(lines, file_path, ignore_next_lines))
     return findings
 
