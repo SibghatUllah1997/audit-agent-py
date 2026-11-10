@@ -17,3 +17,9 @@ def test_roadmap_marks_zero_address_and_magic_numbers_done() -> None:
     text = ROADMAP.read_text(encoding="utf-8")
     assert "- [x] Day 24: Add rule for missing zero-address checks" in text
     assert "- [x] Day 25: Add rule for magic numbers without constants" in text
+
+
+def test_constructor_call_rule_is_documented_and_marked_done() -> None:
+    assert "| A018 | MEDIUM" in README.read_text(encoding="utf-8")
+    roadmap = ROADMAP.read_text(encoding="utf-8")
+    assert "- [x] Day 26: Add rule for external calls in constructors" in roadmap

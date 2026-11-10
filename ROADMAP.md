@@ -25,7 +25,7 @@
 - [x] Day 23: Add rule for uninitialized `address` variables
 - [x] Day 24: Add rule for missing zero-address checks
 - [x] Day 25: Add rule for magic numbers without constants
-- Day 26: Add rule for external calls in constructors
+- [x] Day 26: Add rule for external calls in constructors
 - Day 27: Add rule for payable functions w/o withdraw paths
 - Day 28: Add rule for incorrect `onlyOwner` patterns
 - Day 29: Add doc examples for each rule with rationale

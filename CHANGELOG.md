@@ -1,6 +1,8 @@
 # Changelog
 
 ## 2026-11-10
+- Added rule A018 to flag external calls inside constructors: low-level calls and ether sends, `Interface(addr).fn()` casts, calls on contract-typed variables, and `this.fn()`.
+- Added a constructor example to the sample contract, documented the code, and marked day 26 on the roadmap.
 - Added rule A016 to flag address parameters written into storage without an `address(0)` check, including constructors.
 - Added rule A017 to flag numeric literals that are not named `constant` or `immutable` values.
 - Documented both codes and marked days 24 and 25 on the roadmap.
