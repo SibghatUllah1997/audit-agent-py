@@ -170,6 +170,16 @@ STORE_PARAM_FMT = (
     r"(?:(?:payable|address|[A-Z][A-Za-z0-9_]*)\s*\(\s*)?{name}\b"
 )
 
+MAGIC_LITERAL_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9_])"
+    r"(?P<lit>\d(?:_?\d)*(?:\.\d(?:_?\d)*)?(?:[eE]\d+)?)"
+    r"(?![A-Za-z_0-9])"
+)
+CONSTANT_OR_IMMUTABLE_PATTERN = re.compile(r"\b(?:constant|immutable)\b", re.IGNORECASE)
+ENUM_START_PATTERN = re.compile(r"\benum\s+[A-Za-z_]\w*\s*\{")
+PRAGMA_OR_IMPORT_PATTERN = re.compile(r"^\s*(?:pragma|import)\b", re.IGNORECASE)
+TRIVIAL_NUMBER_VALUES = frozenset({0, 1})
+
 REQUIRE_VAR_PATTERN_FMT = r"require\s*\(\s*{var}\s*(?:[,)])"
 ASSERT_VAR_PATTERN_FMT = r"assert\s*\(\s*{var}\s*\)"
 IF_NOT_VAR_PATTERN_FMT = r"if\s*\(\s*!\s*{var}\s*\)"
@@ -880,6 +890,77 @@ def _function_source(lines: list[str], func: _FunctionInfo) -> str:
     )
 
 
+def _enum_body_lines(lines: list[str]) -> set[int]:
+    """Line numbers that sit inside an enum body (member names, not magic values)."""
+    inside: set[int] = set()
+    depth = 0
+    for idx, line in enumerate(lines, start=1):
+        code = _without_line_comment(line)
+        if depth == 0 and ENUM_START_PATTERN.search(code):
+            depth = code.count("{") - code.count("}")
+            continue
+        if depth > 0:
+            inside.add(idx)
+            depth += code.count("{") - code.count("}")
+    return inside
+
+
+def _is_trivial_number(literal: str) -> bool:
+    """True for 0/1 in decimal, scientific, or dotted form."""
+    normalized = literal.replace("_", "")
+    try:
+        if "." in normalized or "e" in normalized.lower():
+            return float(normalized) in (0.0, 1.0)
+        return int(normalized) in TRIVIAL_NUMBER_VALUES
+    except ValueError:
+        return False
+
+
+def _detect_magic_numbers(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    # Bare numeric literals in logic are harder to review than named constants.
+    enum_lines = _enum_body_lines(lines)
+    for idx, line in enumerate(lines, start=1):
+        if ignore_next_lines and idx in ignore_next_lines:
+            continue
+        if idx in enum_lines:
+            continue
+        stripped = line.strip()
+        if not stripped or stripped.startswith("//"):
+            continue
+        if "/*" in line and "*/" in line:
+            continue
+        code = _without_line_comment(line)
+        if not code.strip():
+            continue
+        if PRAGMA_OR_IMPORT_PATTERN.match(code):
+            continue
+        if CONSTANT_OR_IMMUTABLE_PATTERN.search(code):
+            continue
+        literals = [
+            match.group("lit")
+            for match in MAGIC_LITERAL_PATTERN.finditer(code)
+            if not _is_trivial_number(match.group("lit"))
+        ]
+        if not literals:
+            continue
+        unique = list(dict.fromkeys(literals))
+        if len(unique) == 1:
+            detail = f"Magic number {unique[0]} is not a named constant."
+        else:
+            joined = ", ".join(unique)
+            detail = f"Magic numbers {joined} are not named constants."
+        yield Finding(
+            file_path=file_path,
+            line_number=idx,
+            code="A017",
+            severity="LOW",
+            message=detail,
+            line_text=line.rstrip(),
+        )
+
+
 def _detect_missing_zero_address_check(
     lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
 ) -> Iterator[Finding]:
@@ -955,5 +1036,6 @@ def scan_paths(
         findings.extend(_detect_blockhash_misuse(lines, file_path, ignore_next_lines))
         findings.extend(_detect_uninitialized_address(lines, file_path, ignore_next_lines))
         findings.extend(_detect_missing_zero_address_check(lines, file_path, ignore_next_lines))
+        findings.extend(_detect_magic_numbers(lines, file_path, ignore_next_lines))
     return findings
 
