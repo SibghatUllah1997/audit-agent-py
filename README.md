@@ -55,22 +55,25 @@ Example output (real):
 
 ```
 /workspace/examples/Vulnerable.sol:13: A001 Potential risky use of tx.origin (often unsafe for auth).
+/workspace/examples/Vulnerable.sol:17: A001 Potential risky use of tx.origin (often unsafe for auth).
+/workspace/examples/Vulnerable.sol:20: A001 Potential risky use of tx.origin (often unsafe for auth).
 /workspace/examples/Vulnerable.sol:20: A014 tx.origin used in an authorization comparison; prefer msg.sender.
 /workspace/examples/Vulnerable.sol:12: A002 Low-level call without capturing/validating success (heuristic).
-/workspace/examples/Vulnerable.sol:20: A002 Low-level call without capturing/validating success (heuristic).
-/workspace/examples/Vulnerable.sol:20: A003 Use of delegatecall detected; review proxy pattern and calldata handling.
-/workspace/examples/Vulnerable.sol:26: A004 Use of selfdestruct detected; can brick contracts and break integrations.
-/workspace/examples/Vulnerable.sol:18: A005 Function parameter "data" shadows a state variable.
-/workspace/examples/Vulnerable.sol:24: A005 Function parameter "to" shadows a state variable.
-/workspace/examples/Vulnerable.sol:36: A005 Function parameter "owner" shadows a state variable.
-/workspace/examples/Vulnerable.sol:56: A005 Function parameter "qty" shadows a state variable.
-/workspace/examples/Vulnerable.sol:32: A006 Use of block.timestamp/now detected; time can be manipulated slightly.
-/workspace/examples/Vulnerable.sol:44: A007 Unchecked arithmetic in pre-0.8 Solidity (overflow/underflow risk).
-/workspace/examples/Vulnerable.sol:51: A008 External call before state update looks reentrancy-prone (heuristic).
-/workspace/examples/Vulnerable.sol:18: A009 Sensitive function appears to lack access control (heuristic).
+/workspace/examples/Vulnerable.sol:26: A002 Low-level call without capturing/validating success (heuristic).
+/workspace/examples/Vulnerable.sol:26: A003 Use of delegatecall detected; review proxy pattern and calldata handling.
+/workspace/examples/Vulnerable.sol:32: A004 Use of selfdestruct detected; can brick contracts and break integrations.
+/workspace/examples/Vulnerable.sol:42: A005 Function parameter "owner" shadows a state variable.
+/workspace/examples/Vulnerable.sol:38: A006 Use of block.timestamp/now detected; time can be manipulated slightly.
+/workspace/examples/Vulnerable.sol:50: A007 Unchecked arithmetic in pre-0.8 Solidity (overflow/underflow risk).
+/workspace/examples/Vulnerable.sol:92: A007 Unchecked arithmetic in pre-0.8 Solidity (overflow/underflow risk).
+/workspace/examples/Vulnerable.sol:57: A008 External call before state update looks reentrancy-prone (heuristic).
 /workspace/examples/Vulnerable.sol:24: A009 Sensitive function appears to lack access control (heuristic).
-/workspace/examples/Vulnerable.sol:36: A009 Sensitive function appears to lack access control (heuristic).
-/workspace/examples/Vulnerable.sol:56: A009 Sensitive function appears to lack access control (heuristic).
+/workspace/examples/Vulnerable.sol:30: A009 Sensitive function appears to lack access control (heuristic).
+/workspace/examples/Vulnerable.sol:42: A009 Sensitive function appears to lack access control (heuristic).
+/workspace/examples/Vulnerable.sol:62: A009 Sensitive function appears to lack access control (heuristic).
+/workspace/examples/Vulnerable.sol:68: A012 Event "Transfer" is missing a critical amount parameter.
+/workspace/examples/Vulnerable.sol:78: A013 blockhash(block.number) is always zero and cannot seed randomness.
+/workspace/examples/Vulnerable.sol:5: A015 State address "owner" is never assigned and stays address(0).
 /workspace/examples/Vulnerable.sol:86: A016 Address parameter "newTreasury" is stored without a zero-address check.
 /workspace/examples/Vulnerable.sol:92: A017 Magic numbers 25, 10000 are not named constants.
 /workspace/examples/Vulnerable.sol:98: A018 External call via .call() inside a constructor; the contract is not fully set up.
@@ -84,6 +87,12 @@ Notes
 - `--format summary` prints only the counts. `--format json` stays machine-readable (no summary footer).
 - `--format github` prints GitHub Actions workflow commands so findings become inline annotations.
 - Exit code is 1 when findings exist, else 0.
+
+Rule explanations
+- `sibaudit --list-rules` prints every code with its severity and title.
+- `sibaudit --explain A008` prints why the rule matters plus a flagged and a fixed snippet.
+- The same text, for every rule, lives in [docs/RULES.md](docs/RULES.md). It is generated with
+  `python -m sibaudit.rules > docs/RULES.md`, and tests scan each snippet so the examples stay honest.
 
 JSON output
 
