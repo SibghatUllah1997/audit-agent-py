@@ -1,6 +1,10 @@
 # Changelog
 
 ## 2026-11-11
+- Added a rule catalog with a rationale, a flagged snippet, and a fixed snippet for every code, exposed as `sibaudit --explain CODE` and `sibaudit --list-rules`.
+- Added `docs/RULES.md`, generated from the catalog; tests scan every snippet so flagged examples must trigger their rule and fixed ones must come back clean.
+- Fixed A005 false positives: statements inside functions are no longer read as state variables, and `returns (...)` lists are no longer read as inputs.
+- Refreshed the README sample output and marked day 29 on the roadmap.
 - Added rule A019 to flag payable functions, `receive`/`fallback`, and payable constructors that take ether when the contract has no way to send it out.
 - Added rule A020 to flag `onlyOwner`-style modifiers that never check the caller, check after the body runs, or authenticate with `tx.origin`.
 - Documented both codes and marked days 27 and 28 on the roadmap.

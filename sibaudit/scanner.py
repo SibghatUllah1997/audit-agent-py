@@ -205,6 +205,7 @@ CALL_WITH_VALUE_PATTERN = re.compile(
 )
 ETHER_SEND_PATTERN = re.compile(r"\.\s*send\s*\(")
 ETHER_TRANSFER_OPEN_PATTERN = re.compile(r"\.\s*transfer\s*\(")
+CONTRACT_DECL_PATTERN = re.compile(r"(?:abstract\s+)?contract\s+[A-Za-z_]\w*\b")
 MODIFIER_START_PATTERN = re.compile(r"\bmodifier\s+(?P<name>[A-Za-z_]\w*)\b")
 OWNER_MODIFIER_NAMES = frozenset(
     {
@@ -586,7 +587,9 @@ def _detect_state_var_shadowing(
     lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
 ) -> Iterator[Finding]:
     # Heuristic: collect state variable names declared at contract scope, then
-    # flag any function parameter that reuses the same identifier.
+    # flag any function parameter that reuses the same identifier. Only lines at
+    # the top level of a contract body count as declarations; statements inside
+    # functions or modifiers (e.g. `balances[to] += amount;`) are not state.
     severity = "LOW"
     state_vars: set[str] = set()
     in_contract = False
@@ -594,13 +597,15 @@ def _detect_state_var_shadowing(
 
     # First pass: gather state variables
     for raw in lines:
-        line = raw.strip()
-        # Track braces to approximate contract scope
-        brace_depth += raw.count("{")
-        brace_depth -= raw.count("}")
-        if line.startswith("contract "):
+        code = _without_line_comment(raw)
+        line = code.strip()
+        depth_before = brace_depth
+        brace_depth += code.count("{")
+        brace_depth -= code.count("}")
+        if CONTRACT_DECL_PATTERN.match(line):
             in_contract = True
-        if in_contract and ";" in raw:
+            continue
+        if in_contract and depth_before == 1 and ";" in code:
             lower = line.lower()
             if any(
                 k in lower
@@ -615,8 +620,9 @@ def _detect_state_var_shadowing(
                 )
             ):
                 continue
-            # Extract the last identifier token before the semicolon as the variable name
-            identifiers = re.findall(r"[A-Za-z_]\w*", raw)
+            # The declared name is the last identifier before `=` or `;`.
+            declaration = re.split(r"=|;", code, maxsplit=1)[0]
+            identifiers = re.findall(r"[A-Za-z_]\w*", declaration)
             if identifiers:
                 candidate = identifiers[-1]
                 # Basic guard: avoid common qualifiers accidentally captured
@@ -641,7 +647,8 @@ def _detect_state_var_shadowing(
             in_contract = False
 
     # Second pass: check function parameter lists
-    func_sig = re.compile(r"\bfunction\b[^{;]*\((?P<params>[^)]*)\)")
+    # Match the first parenthesised list (inputs), not a later `returns (...)`.
+    func_sig = re.compile(r"\bfunction\b[^({;]*\((?P<params>[^)]*)\)")
     for idx, raw in enumerate(lines, start=1):
         if ignore_next_lines and idx in ignore_next_lines:
             continue

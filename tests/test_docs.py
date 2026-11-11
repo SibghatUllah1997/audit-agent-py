@@ -32,3 +32,18 @@ def test_payable_and_only_owner_rules_are_documented_and_marked_done() -> None:
     roadmap = ROADMAP.read_text(encoding="utf-8")
     assert "- [x] Day 27: Add rule for payable functions w/o withdraw paths" in roadmap
     assert "- [x] Day 28: Add rule for incorrect `onlyOwner` patterns" in roadmap
+
+
+def test_rules_reference_is_generated_from_the_catalog() -> None:
+    from sibaudit.rules import render_markdown
+
+    rules_doc = ROOT / "docs" / "RULES.md"
+    assert rules_doc.read_text(encoding="utf-8") == render_markdown(), (
+        "docs/RULES.md is stale; run `python -m sibaudit.rules > docs/RULES.md`"
+    )
+
+
+def test_rule_examples_are_documented_and_marked_done() -> None:
+    assert "sibaudit --explain" in README.read_text(encoding="utf-8")
+    roadmap = ROADMAP.read_text(encoding="utf-8")
+    assert "- [x] Day 29: Add doc examples for each rule with rationale" in roadmap
