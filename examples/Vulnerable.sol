@@ -111,3 +111,17 @@ contract LockedVault {
         gifts[msg.sender] += msg.value;
     }
 }
+
+// onlyOwner looks like access control but never checks the caller.
+contract FakeOwnable {
+    uint256 public n;
+
+    modifier onlyOwner() {
+        // A020
+        _;
+    }
+
+    function bump() external onlyOwner {
+        n = 1;
+    }
+}

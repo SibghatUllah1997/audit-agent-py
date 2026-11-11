@@ -46,3 +46,11 @@ def test_sample_contract_flags_payable_without_withdraw() -> None:
     assert any("receive" in f.message.lower() or "receive()" in f.line_text for f in locked)
     # The main sample already sends ether in withdraw(), so it must stay quiet.
     assert not any("function withdraw()" in f.line_text for f in locked)
+
+
+def test_sample_contract_flags_broken_only_owner() -> None:
+    findings = scan_paths([str(EXAMPLES)])
+    broken = [f for f in findings if f.code == "A020"]
+    assert broken
+    assert any("onlyOwner" in f.line_text for f in broken)
+    assert any("never checks the caller" in f.message for f in broken)
