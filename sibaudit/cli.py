@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .baseline import BaselineError, apply_baseline, load_baseline, write_baseline
 from .report import format_github_annotations, format_summary
+from .rules import format_explain, format_rule_list, get_rule
 from .scanner import Finding, scan_paths
 
 
@@ -55,11 +56,32 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         default=None,
         help="Write a JSON snapshot of current findings (before --baseline filtering).",
     )
+    parser.add_argument(
+        "--explain",
+        metavar="CODE",
+        default=None,
+        help="Print why a rule matters plus a flagged and a fixed example, then exit.",
+    )
+    parser.add_argument(
+        "--list-rules",
+        action="store_true",
+        help="List every rule code with its severity and title, then exit.",
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> None:
     ns = parse_args(sys.argv[1:] if argv is None else argv)
+    if ns.list_rules:
+        print(format_rule_list())
+        sys.exit(0)
+    if ns.explain is not None:
+        rule = get_rule(ns.explain)
+        if rule is None:
+            print(f"error: unknown rule code {ns.explain!r}; see --list-rules", file=sys.stderr)
+            sys.exit(2)
+        print(format_explain(rule))
+        sys.exit(0)
     findings = scan_paths(ns.paths, include=ns.include, exclude=ns.exclude)
     root = Path.cwd().resolve()
     entries = []
