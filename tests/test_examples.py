@@ -36,3 +36,13 @@ def test_sample_contract_flags_zero_address_and_magic_numbers() -> None:
 def test_sample_contract_flags_constructor_external_call() -> None:
     findings = scan_paths([str(EXAMPLES)])
     assert any(f.code == "A018" and "registry.call" in f.line_text for f in findings)
+
+
+def test_sample_contract_flags_payable_without_withdraw() -> None:
+    findings = scan_paths([str(EXAMPLES)])
+    locked = [f for f in findings if f.code == "A019"]
+    assert locked
+    assert any("donate" in f.message or "donate" in f.line_text for f in locked)
+    assert any("receive" in f.message.lower() or "receive()" in f.line_text for f in locked)
+    # The main sample already sends ether in withdraw(), so it must stay quiet.
+    assert not any("function withdraw()" in f.line_text for f in locked)

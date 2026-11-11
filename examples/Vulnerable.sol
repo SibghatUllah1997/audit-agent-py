@@ -99,3 +99,15 @@ contract Vulnerable {
         require(ok, "register failed");
     }
 }
+
+// Ether can enter, but nothing in this contract can send it out.
+contract LockedVault {
+    mapping(address => uint256) public gifts;
+
+    receive() external payable {}
+
+    function donate() external payable {
+        // A019
+        gifts[msg.sender] += msg.value;
+    }
+}
