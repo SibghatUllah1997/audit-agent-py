@@ -34,7 +34,11 @@ EXTERNAL_INTERACTION_PATTERN = re.compile(
     re.IGNORECASE,
 )
 CALLABLE_START_PATTERN = re.compile(
-    r"\b(?:function\s+(?P<func>[A-Za-z_]\w*)|(?P<ctor>constructor))\s*\("
+    r"(?<![\w.])(?:function\s+(?P<func>[A-Za-z_]\w*)|(?P<ctor>constructor)|"
+    r"(?P<special>receive|fallback))\s*\("
+)
+TYPE_START_PATTERN = re.compile(
+    r"\b(?P<abstract>abstract\s+)?(?P<kind>contract|library|interface)\s+(?P<name>[A-Za-z_]\w*)"
 )
 VISIBILITY_PATTERN = re.compile(r"\b(external|public|internal|private)\b")
 VIEW_PURE_PATTERN = re.compile(r"\b(?:view|pure)\b")
@@ -195,6 +199,12 @@ CONTRACT_TYPED_NAME_PATTERN = re.compile(
 )
 MEMBER_CALL_FMT = r"(?<![\w.]){name}\s*\.\s*[A-Za-z_]\w*\s*(?:\{{[^}}]*\}})?\s*\("
 NON_CONTRACT_TYPES = frozenset({"Error", "Panic"})
+CALL_WITH_VALUE_PATTERN = re.compile(
+    r"\.\s*call\s*\{[^}]*\bvalue\s*:",
+    re.IGNORECASE,
+)
+ETHER_SEND_PATTERN = re.compile(r"\.\s*send\s*\(")
+ETHER_TRANSFER_OPEN_PATTERN = re.compile(r"\.\s*transfer\s*\(")
 
 REQUIRE_VAR_PATTERN_FMT = r"require\s*\(\s*{var}\s*(?:[,)])"
 ASSERT_VAR_PATTERN_FMT = r"assert\s*\(\s*{var}\s*\)"
@@ -220,6 +230,16 @@ class _FunctionInfo:
     visibility: str
     modifiers: tuple[str, ...]
     is_view_or_pure: bool
+
+
+@dataclass(frozen=True)
+class _ContractInfo:
+    name: str
+    kind: str
+    is_abstract: bool
+    start_line: int
+    end_line: int
+    bases: tuple[str, ...]
 
 
 def _iter_solidity_files(
@@ -255,7 +275,7 @@ def _iter_functions(
         if not match:
             i += 1
             continue
-        name = match.group("func") or "constructor"
+        name = match.group("func") or match.group("special") or "constructor"
         header_chunks: list[str] = []
         paren = 0
         seen_open_paren = False
@@ -1089,6 +1109,216 @@ def _detect_constructor_external_calls(
             )
 
 
+def _parse_bases(header: str) -> tuple[str, ...]:
+    """Base contract names from a `contract X is A, B(1)` header."""
+    match = re.search(r"\bis\b(?P<bases>[^{]*)\{", header, re.DOTALL)
+    if not match:
+        return ()
+    names: list[str] = []
+    depth = 0
+    current: list[str] = []
+    for char in match.group("bases"):
+        if char == "(":
+            depth += 1
+            continue
+        if char == ")":
+            depth -= 1
+            continue
+        if char == "," and depth == 0:
+            ident = re.findall(r"[A-Za-z_]\w*", "".join(current))
+            if ident:
+                names.append(ident[0])
+            current = []
+            continue
+        if depth == 0:
+            current.append(char)
+    ident = re.findall(r"[A-Za-z_]\w*", "".join(current))
+    if ident:
+        names.append(ident[0])
+    return tuple(names)
+
+
+def _iter_contracts(lines: list[str]) -> Iterator[_ContractInfo]:
+    n = len(lines)
+    i = 0
+    while i < n:
+        match = TYPE_START_PATTERN.search(_without_line_comment(lines[i]))
+        if not match:
+            i += 1
+            continue
+        header_chunks: list[str] = []
+        body_open_i: int | None = None
+        is_proto = False
+        j = i
+        while j < n:
+            piece = _without_line_comment(lines[j])
+            header_chunks.append(piece)
+            if "{" in piece:
+                body_open_i = j
+                break
+            if ";" in piece:
+                is_proto = True
+                break
+            j += 1
+        if is_proto or body_open_i is None:
+            i = j + 1
+            continue
+        brace = 0
+        started = False
+        end_i = body_open_i
+        k = body_open_i
+        while k < n:
+            piece = _without_line_comment(lines[k])
+            for ch in piece:
+                if ch == "{":
+                    brace += 1
+                    started = True
+                elif ch == "}":
+                    brace -= 1
+                    if started and brace == 0:
+                        end_i = k
+                        break
+            if started and brace == 0:
+                break
+            k += 1
+        header = "\n".join(header_chunks)
+        yield _ContractInfo(
+            name=match.group("name"),
+            kind=match.group("kind"),
+            is_abstract=bool(match.group("abstract")),
+            start_line=i + 1,
+            end_line=end_i + 1,
+            bases=_parse_bases(header),
+        )
+        i = end_i + 1
+
+
+def _extract_paren_args(text: str, open_index: int) -> str | None:
+    """Return the text inside the parenthesis group that starts at `open_index`."""
+    if open_index >= len(text) or text[open_index] != "(":
+        return None
+    depth = 0
+    for index in range(open_index, len(text)):
+        char = text[index]
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+            if depth == 0:
+                return text[open_index + 1 : index]
+    return None
+
+
+def _has_top_level_comma(args: str) -> bool:
+    depth = 0
+    for char in args:
+        if char in "([{":
+            depth += 1
+        elif char in ")]}":
+            depth -= 1
+        elif char == "," and depth == 0:
+            return True
+    return False
+
+
+def _sends_ether(code: str) -> bool:
+    """True if `code` sends ether (not an ERC-20 transfer)."""
+    if SELFDESTRUCT_OR_SUICIDE_PATTERN.search(code):
+        return True
+    if ETHER_SEND_PATTERN.search(code):
+        return True
+    if CALL_WITH_VALUE_PATTERN.search(code):
+        return True
+    for match in ETHER_TRANSFER_OPEN_PATTERN.finditer(code):
+        args = _extract_paren_args(code, match.end() - 1)
+        if args is None:
+            continue
+        if not _has_top_level_comma(args):
+            return True
+    return False
+
+
+def _header_is_payable(header: str, name: str) -> bool:
+    """True if this callable can receive ether."""
+    if name == "receive":
+        return True
+    after_params = header.split(")", 1)[-1].split("{", 1)[0]
+    return bool(re.search(r"\bpayable\b", after_params))
+
+
+def _payable_entry_label(func: _FunctionInfo) -> str:
+    if func.name == "constructor":
+        return "Payable constructor"
+    if func.name == "receive":
+        return "Payable receive()"
+    if func.name == "fallback":
+        return "Payable fallback()"
+    return f'Payable function "{func.name}"'
+
+
+def _contract_family_names(
+    contract: _ContractInfo, by_name: dict[str, _ContractInfo]
+) -> set[str]:
+    """This contract plus same-file ancestors, following `is` lists."""
+    family = {contract.name}
+    stack = list(contract.bases)
+    while stack:
+        base = stack.pop()
+        if base in family:
+            continue
+        family.add(base)
+        parent = by_name.get(base)
+        if parent is not None:
+            stack.extend(parent.bases)
+    return family
+
+
+def _detect_payable_without_withdraw(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    # Ether that can enter a contract with no way out is stuck forever.
+    # Same-file parents count as a withdraw path so inherited wallets are quiet.
+    contracts = [c for c in _iter_contracts(lines) if c.kind == "contract"]
+    if not contracts:
+        return
+    by_name = {c.name: c for c in contracts}
+    functions = list(_iter_functions(lines, include_constructors=True))
+    for contract in contracts:
+        family = _contract_family_names(contract, by_name)
+        family_source_parts: list[str] = []
+        for member in contracts:
+            if member.name not in family:
+                continue
+            family_source_parts.append(
+                "\n".join(
+                    _without_line_comment(lines[idx])
+                    for idx in range(member.start_line - 1, member.end_line)
+                )
+            )
+        if _sends_ether("\n".join(family_source_parts)):
+            continue
+        for func in functions:
+            if not (contract.start_line <= func.start_line <= contract.end_line):
+                continue
+            if ignore_next_lines and func.start_line in ignore_next_lines:
+                continue
+            if func.is_view_or_pure:
+                continue
+            if func.name != "constructor" and func.visibility in {"internal", "private"}:
+                continue
+            if not _header_is_payable(func.header, func.name):
+                continue
+            label = _payable_entry_label(func)
+            yield Finding(
+                file_path=file_path,
+                line_number=func.start_line,
+                code="A019",
+                severity="MEDIUM",
+                message=f"{label} can receive ether, but the contract has no withdraw path.",
+                line_text=lines[func.start_line - 1].rstrip(),
+            )
+
+
 def scan_paths(
     paths: Iterable[str],
     include: Sequence[str] | None = None,
@@ -1127,5 +1357,6 @@ def scan_paths(
         findings.extend(_detect_missing_zero_address_check(lines, file_path, ignore_next_lines))
         findings.extend(_detect_magic_numbers(lines, file_path, ignore_next_lines))
         findings.extend(_detect_constructor_external_calls(lines, file_path, ignore_next_lines))
+        findings.extend(_detect_payable_without_withdraw(lines, file_path, ignore_next_lines))
     return findings
 
