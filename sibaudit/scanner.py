@@ -205,6 +205,27 @@ CALL_WITH_VALUE_PATTERN = re.compile(
 )
 ETHER_SEND_PATTERN = re.compile(r"\.\s*send\s*\(")
 ETHER_TRANSFER_OPEN_PATTERN = re.compile(r"\.\s*transfer\s*\(")
+MODIFIER_START_PATTERN = re.compile(r"\bmodifier\s+(?P<name>[A-Za-z_]\w*)\b")
+OWNER_MODIFIER_NAMES = frozenset(
+    {
+        "onlyowner",
+        "onlyadmin",
+        "onlygovernance",
+        "onlyguardian",
+        "onlyminter",
+    }
+)
+MODIFIER_PLACEHOLDER_PATTERN = re.compile(r"(?<![A-Za-z0-9_])_;")
+SENDER_EXPR = r"(?:msg\.sender|_msgSender\s*\(\s*\))"
+SENDER_COMPARE_PATTERN = re.compile(rf"{SENDER_EXPR}\s*(?:==|!=)|(?:==|!=)\s*{SENDER_EXPR}")
+SENDER_TAUTOLOGY_PATTERN = re.compile(rf"{SENDER_EXPR}\s*(?:==|!=)\s*{SENDER_EXPR}")
+OWNER_HELPER_PATTERN = re.compile(
+    r"\b(?:hasRole|_checkOwner|_checkRole|isOwner|_isOwner|onlyRole)\s*\("
+)
+TX_ORIGIN_COMPARE_IN_MOD_PATTERN = re.compile(
+    r"tx\.origin\s*(?:==|!=)|(?:==|!=)\s*tx\.origin"
+)
+REQUIRE_TRUE_PATTERN = re.compile(r"\brequire\s*\(\s*true\s*[,)]")
 
 REQUIRE_VAR_PATTERN_FMT = r"require\s*\(\s*{var}\s*(?:[,)])"
 ASSERT_VAR_PATTERN_FMT = r"assert\s*\(\s*{var}\s*\)"
@@ -240,6 +261,14 @@ class _ContractInfo:
     start_line: int
     end_line: int
     bases: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class _ModifierInfo:
+    name: str
+    start_line: int
+    end_line: int
+    header: str
 
 
 def _iter_solidity_files(
@@ -1319,6 +1348,126 @@ def _detect_payable_without_withdraw(
             )
 
 
+def _iter_modifiers(lines: list[str]) -> Iterator[_ModifierInfo]:
+    n = len(lines)
+    i = 0
+    while i < n:
+        match = MODIFIER_START_PATTERN.search(_without_line_comment(lines[i]))
+        if not match:
+            i += 1
+            continue
+        header_chunks: list[str] = []
+        body_open_i: int | None = None
+        is_proto = False
+        j = i
+        while j < n:
+            piece = _without_line_comment(lines[j])
+            header_chunks.append(piece)
+            if "{" in piece:
+                body_open_i = j
+                break
+            if ";" in piece:
+                is_proto = True
+                break
+            j += 1
+        if is_proto or body_open_i is None:
+            i = j + 1
+            continue
+        brace = 0
+        started = False
+        end_i = body_open_i
+        k = body_open_i
+        while k < n:
+            piece = _without_line_comment(lines[k])
+            for ch in piece:
+                if ch == "{":
+                    brace += 1
+                    started = True
+                elif ch == "}":
+                    brace -= 1
+                    if started and brace == 0:
+                        end_i = k
+                        break
+            if started and brace == 0:
+                break
+            k += 1
+        yield _ModifierInfo(
+            name=match.group("name"),
+            start_line=i + 1,
+            end_line=end_i + 1,
+            header="\n".join(header_chunks),
+        )
+        i = end_i + 1
+
+
+def _is_owner_modifier_name(name: str) -> bool:
+    return name.lower() in OWNER_MODIFIER_NAMES
+
+
+def _modifier_source(lines: list[str], modifier: _ModifierInfo) -> str:
+    return "\n".join(
+        _without_line_comment(lines[idx])
+        for idx in range(modifier.start_line - 1, modifier.end_line)
+    )
+
+
+def _has_real_sender_compare(text: str) -> bool:
+    for match in SENDER_COMPARE_PATTERN.finditer(text):
+        window = text[max(0, match.start() - 48) : match.end() + 48]
+        if SENDER_TAUTOLOGY_PATTERN.search(window):
+            continue
+        return True
+    return False
+
+
+def _has_auth_check(text: str) -> bool:
+    if _has_real_sender_compare(text):
+        return True
+    return bool(OWNER_HELPER_PATTERN.search(text))
+
+
+def _detect_incorrect_only_owner(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    # onlyOwner that never checks the caller, checks after `_;`, or uses
+    # tx.origin is access control that looks real and does nothing useful.
+    for modifier in _iter_modifiers(lines):
+        if ignore_next_lines and modifier.start_line in ignore_next_lines:
+            continue
+        if not _is_owner_modifier_name(modifier.name):
+            continue
+        source = _modifier_source(lines, modifier)
+        placeholder = MODIFIER_PLACEHOLDER_PATTERN.search(source)
+        before = source[: placeholder.start()] if placeholder else source
+        after = source[placeholder.end() :] if placeholder else ""
+        if TX_ORIGIN_COMPARE_IN_MOD_PATTERN.search(before) and not _has_real_sender_compare(
+            before
+        ):
+            message = (
+                f'Modifier "{modifier.name}" authenticates with tx.origin; use msg.sender.'
+            )
+        elif SENDER_TAUTOLOGY_PATTERN.search(before) and not _has_auth_check(before):
+            message = f'Modifier "{modifier.name}" compares msg.sender to itself.'
+        elif REQUIRE_TRUE_PATTERN.search(before) and not _has_auth_check(before):
+            message = f'Modifier "{modifier.name}" requires true and never checks the caller.'
+        elif _has_auth_check(before):
+            continue
+        elif _has_auth_check(after):
+            message = (
+                f'Modifier "{modifier.name}" checks authorization after the function body runs.'
+            )
+        else:
+            message = f'Modifier "{modifier.name}" never checks the caller.'
+        yield Finding(
+            file_path=file_path,
+            line_number=modifier.start_line,
+            code="A020",
+            severity="HIGH",
+            message=message,
+            line_text=lines[modifier.start_line - 1].rstrip(),
+        )
+
+
 def scan_paths(
     paths: Iterable[str],
     include: Sequence[str] | None = None,
@@ -1358,5 +1507,6 @@ def scan_paths(
         findings.extend(_detect_magic_numbers(lines, file_path, ignore_next_lines))
         findings.extend(_detect_constructor_external_calls(lines, file_path, ignore_next_lines))
         findings.extend(_detect_payable_without_withdraw(lines, file_path, ignore_next_lines))
+        findings.extend(_detect_incorrect_only_owner(lines, file_path, ignore_next_lines))
     return findings
 
