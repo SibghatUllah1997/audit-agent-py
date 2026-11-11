@@ -31,6 +31,8 @@ Rules
 | A016 | MEDIUM   | Address parameter stored without a zero-address check |
 | A017 | LOW      | Numeric literal that is not a named constant |
 | A018 | MEDIUM   | External call made inside a constructor |
+| A019 | MEDIUM   | Payable function that can receive ether with no withdraw path |
+| A020 | HIGH     | `onlyOwner`-style modifier that does not actually check the caller |
 
 Install
 - Python 3.11+
@@ -72,6 +74,9 @@ Example output (real):
 /workspace/examples/Vulnerable.sol:86: A016 Address parameter "newTreasury" is stored without a zero-address check.
 /workspace/examples/Vulnerable.sol:92: A017 Magic numbers 25, 10000 are not named constants.
 /workspace/examples/Vulnerable.sol:98: A018 External call via .call() inside a constructor; the contract is not fully set up.
+/workspace/examples/Vulnerable.sol:107: A019 Payable receive() can receive ether, but the contract has no withdraw path.
+/workspace/examples/Vulnerable.sol:109: A019 Payable function "donate" can receive ether, but the contract has no withdraw path.
+/workspace/examples/Vulnerable.sol:119: A020 Modifier "onlyOwner" never checks the caller.
 ```
 
 Notes
@@ -242,7 +247,9 @@ flowchart TD
     D --> E9[missing access control]
     D --> E10[zero-address check]
     D --> E11[magic numbers]
-    E1 & E2 & E3 & E4 & E5 & E6 & E7 & E8 & E9 & E10 & E11 --> F[Findings list]
+    D --> E12[locked ether]
+    D --> E13[broken onlyOwner]
+    E1 & E2 & E3 & E4 & E5 & E6 & E7 & E8 & E9 & E10 & E11 & E12 & E13 --> F[Findings list]
     F -->|optional baseline file| G[Suppress known issues]
     G -->|--format text/json/summary/github| H[stdout + exit code]
 ```

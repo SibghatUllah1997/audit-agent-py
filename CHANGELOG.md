@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-11
+- Added rule A019 to flag payable functions, `receive`/`fallback`, and payable constructors that take ether when the contract has no way to send it out.
+- Added rule A020 to flag `onlyOwner`-style modifiers that never check the caller, check after the body runs, or authenticate with `tx.origin`.
+- Documented both codes and marked days 27 and 28 on the roadmap.
+
 ## 2026-11-10
 - Added rule A018 to flag external calls inside constructors: low-level calls and ether sends, `Interface(addr).fn()` casts, calls on contract-typed variables, and `this.fn()`.
 - Added a constructor example to the sample contract, documented the code, and marked day 26 on the roadmap.

@@ -26,8 +26,8 @@
 - [x] Day 24: Add rule for missing zero-address checks
 - [x] Day 25: Add rule for magic numbers without constants
 - [x] Day 26: Add rule for external calls in constructors
-- Day 27: Add rule for payable functions w/o withdraw paths
-- Day 28: Add rule for incorrect `onlyOwner` patterns
+- [x] Day 27: Add rule for payable functions w/o withdraw paths
+- [x] Day 28: Add rule for incorrect `onlyOwner` patterns
 - Day 29: Add doc examples for each rule with rationale
 - Day 30: Optional LLM-assisted suggestions (offline/local first)
 
