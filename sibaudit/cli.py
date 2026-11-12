@@ -8,6 +8,7 @@ from .baseline import BaselineError, apply_baseline, load_baseline, write_baseli
 from .report import format_github_annotations, format_summary
 from .rules import format_explain, format_rule_list, get_rule
 from .scanner import Finding, scan_paths
+from .suggest import attach_hints
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -67,6 +68,14 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         action="store_true",
         help="List every rule code with its severity and title, then exit.",
     )
+    parser.add_argument(
+        "--suggest",
+        action="store_true",
+        help=(
+            "Attach a local fix hint to each finding from the built-in catalog. "
+            "Works fully offline; nothing is sent over the network."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -95,6 +104,8 @@ def main(argv: list[str] | None = None) -> None:
         write_baseline(Path(ns.write_baseline), findings, root)
     if entries:
         findings = apply_baseline(findings, entries, root)
+    if ns.suggest:
+        findings = attach_hints(findings)
     _print_findings(findings, ns.format)
     # Exit non-zero if any findings
     sys.exit(1 if findings else 0)
@@ -112,6 +123,8 @@ def _print_findings(findings: list[Finding], fmt: str) -> None:
                 "severity": f.severity,
                 "message": f.message,
             }
+            if f.suggestion:
+                record["suggestion"] = f.suggestion
             print(json.dumps(record, ensure_ascii=False))
         return
     if fmt == "github":
@@ -125,6 +138,8 @@ def _print_findings(findings: list[Finding], fmt: str) -> None:
     for f in findings:
         rel = str(Path(f.file_path))
         print(f"{rel}:{f.line_number}: {f.code} {f.message}")
+        if f.suggestion:
+            print(f"    hint: {f.suggestion}")
     if findings:
         print()
         print(format_summary(findings))

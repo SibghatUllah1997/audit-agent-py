@@ -46,6 +46,21 @@ def summarize(findings: Sequence[Finding]) -> Summary:
     )
 
 
+def _hints_by_code(findings: Sequence[Finding]) -> dict[str, tuple[str, ...]]:
+    """Unique non-empty suggestions per rule, in first-seen order."""
+    grouped: dict[str, list[str]] = {}
+    seen: dict[str, set[str]] = {}
+    for finding in findings:
+        hint = finding.suggestion
+        if not hint:
+            continue
+        if hint in seen.setdefault(finding.code, set()):
+            continue
+        seen[finding.code].add(hint)
+        grouped.setdefault(finding.code, []).append(hint)
+    return {code: tuple(hints) for code, hints in grouped.items()}
+
+
 def format_summary(findings: Sequence[Finding]) -> str:
     """Render a plain-text table of counts per rule and per severity."""
     summary = summarize(findings)
@@ -54,6 +69,7 @@ def format_summary(findings: Sequence[Finding]) -> str:
     if summary.total == 0:
         return lines[0]
 
+    hints = _hints_by_code(findings)
     lines.append("")
     lines.append("by rule")
     code_width = max(len(code) for code, _ in summary.by_code)
@@ -64,6 +80,8 @@ def format_summary(findings: Sequence[Finding]) -> str:
         lines.append(
             f"  {code:<{code_width}}  {severity:<{severity_width}}  {count:>{count_width}}"
         )
+        for hint in hints.get(code, ()):
+            lines.append(f"    hint: {hint}")
 
     lines.append("")
     lines.append("by severity")
@@ -102,7 +120,10 @@ def format_github_annotations(
         level = GITHUB_LEVEL.get(finding.severity, "warning")
         file_param = _escape_github_param(relative_display_path(finding.file_path, root))
         title = _escape_github_param(f"{finding.code} ({finding.severity})")
-        message = _escape_github_data(finding.message)
+        message = finding.message
+        if finding.suggestion:
+            message = f"{message} — {finding.suggestion}"
+        message = _escape_github_data(message)
         lines.append(
             f"::{level} file={file_param},line={finding.line_number},title={title}::{message}"
         )
