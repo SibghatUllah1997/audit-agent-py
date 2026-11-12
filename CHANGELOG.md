@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-12
+- Added `--suggest` so each finding can carry a local fix hint from a built-in catalog that never talks to the network.
+- Hints can be overridden with `--suggest-catalog` or a local `--suggest-cmd`; the catalog is used if the command fails.
+- Marked days 1 and 30 complete on the roadmap.
+
 ## 2026-11-11
 - Added a rule catalog with a rationale, a flagged snippet, and a fixed snippet for every code, exposed as `sibaudit --explain CODE` and `sibaudit --list-rules`.
 - Added `docs/RULES.md`, generated from the catalog; tests scan every snippet so flagged examples must trigger their rule and fixed ones must come back clean.

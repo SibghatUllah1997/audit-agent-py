@@ -86,6 +86,7 @@ Notes
 - Text output format is `path:line: CODE message`, followed by a counts summary.
 - `--format summary` prints only the counts. `--format json` stays machine-readable (no summary footer).
 - `--format github` prints GitHub Actions workflow commands so findings become inline annotations.
+- `--suggest` adds a local fix hint under each finding (and a `suggestion` field in JSON).
 - Exit code is 1 when findings exist, else 0.
 
 Rule explanations
@@ -93,6 +94,24 @@ Rule explanations
 - `sibaudit --explain A008` prints why the rule matters plus a flagged and a fixed snippet.
 - The same text, for every rule, lives in [docs/RULES.md](docs/RULES.md). It is generated with
   `python -m sibaudit.rules > docs/RULES.md`, and tests scan each snippet so the examples stay honest.
+
+Local fix hints
+
+`--suggest` attaches a one-line fix hint to each finding from a built-in catalog. Nothing is sent over the network.
+
+```bash
+python3 -m sibaudit --suggest path/to/contracts
+```
+
+```
+Token.sol:7: A001 Potential risky use of tx.origin (often unsafe for auth).
+    hint: Prefer msg.sender for identity and authorization; tx.origin trusts every contract in the call chain.
+```
+
+- `--format json` adds a `suggestion` field. `--format github` appends the hint after an em dash. `--format summary` lists unique hints under each rule.
+- `--suggest-catalog FILE` is a JSON object of `{ "A001": "your hint", ... }` and implies `--suggest`. Codes you omit keep the built-in text.
+- `--suggest-cmd CMD` runs a local command once per finding. The finding is written as one JSON object on stdin (`file_path`, `line_number`, `code`, `severity`, `message`, `line_text`). The first non-empty stdout line becomes the hint. If the command fails, times out, or prints nothing, the catalog hint is used instead.
+- A sample catalog and a sample command live in `examples/suggest/`.
 
 JSON output
 
@@ -109,6 +128,7 @@ Each line is a JSON object with:
 - `code` (string, e.g. `A001`)
 - `severity` (string: `LOW` | `MEDIUM` | `HIGH`)
 - `message` (string)
+- `suggestion` (string, only when `--suggest` is on)
 
 Include and exclude files
 
@@ -260,7 +280,8 @@ flowchart TD
     D --> E13[broken onlyOwner]
     E1 & E2 & E3 & E4 & E5 & E6 & E7 & E8 & E9 & E10 & E11 & E12 & E13 --> F[Findings list]
     F -->|optional baseline file| G[Suppress known issues]
-    G -->|--format text/json/summary/github| H[stdout + exit code]
+    G -->|optional --suggest catalog/cmd| I[Local fix hints]
+    I -->|--format text/json/summary/github| H[stdout + exit code]
 ```
 
 Roadmap

@@ -1,6 +1,6 @@
 # Roadmap (30 tiny daily steps)
 
-- Day 1: Minimal CLI + 2 rules (tx.origin, unchecked call)
+- [x] Day 1: Minimal CLI + 2 rules (tx.origin, unchecked call)
 - [x] Day 2: Add rule for `delegatecall` usage with comments
 - [x] Day 3: Add rule for `selfdestruct`/`suicide`
 - [x] Day 4: Support JSON output format
@@ -29,5 +29,5 @@
 - [x] Day 27: Add rule for payable functions w/o withdraw paths
 - [x] Day 28: Add rule for incorrect `onlyOwner` patterns
 - [x] Day 29: Add doc examples for each rule with rationale
-- Day 30: Optional LLM-assisted suggestions (offline/local first)
+- [x] Day 30: Optional LLM-assisted suggestions (offline/local first)
 

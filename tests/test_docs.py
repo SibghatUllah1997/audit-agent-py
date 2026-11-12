@@ -47,3 +47,20 @@ def test_rule_examples_are_documented_and_marked_done() -> None:
     assert "sibaudit --explain" in README.read_text(encoding="utf-8")
     roadmap = ROADMAP.read_text(encoding="utf-8")
     assert "- [x] Day 29: Add doc examples for each rule with rationale" in roadmap
+
+
+def test_suggest_is_documented_and_days_one_and_thirty_are_done() -> None:
+    from sibaudit.suggest import hint_for
+
+    text = README.read_text(encoding="utf-8")
+    assert "--suggest" in text
+    assert "--suggest-catalog" in text
+    assert "--suggest-cmd" in text
+    assert "examples/suggest/" in text
+    assert f"hint: {hint_for('A001')}" in text
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert "## 2026-11-12" in changelog
+    assert "--suggest" in changelog
+    roadmap = ROADMAP.read_text(encoding="utf-8")
+    assert "- [x] Day 1: Minimal CLI + 2 rules (tx.origin, unchecked call)" in roadmap
+    assert "- [x] Day 30: Optional LLM-assisted suggestions (offline/local first)" in roadmap
