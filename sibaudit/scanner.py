@@ -241,6 +241,7 @@ class Finding:
     severity: str
     message: str
     line_text: str
+    suggestion: str | None = None
 
 
 @dataclass(frozen=True)

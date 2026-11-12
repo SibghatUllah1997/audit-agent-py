@@ -6,9 +6,11 @@ from pathlib import Path
 import pytest
 
 from sibaudit.rules import RULES
+from sibaudit.scanner import Finding
 from sibaudit.suggest import (
     FALLBACK,
     SuggestError,
+    attach_hints,
     builtin_catalog,
     hint_for,
     load_catalog,
@@ -115,6 +117,53 @@ def test_load_catalog_reads_code_to_hint_object(tmp_path: Path) -> None:
     path.write_text(json.dumps({"a001": "  custom one  ", "A002": "custom two"}))
     loaded = load_catalog(path)
     assert loaded == {"A001": "custom one", "A002": "custom two"}
+
+
+def _finding(
+    code: str = "A001",
+    message: str = "Potential risky use of tx.origin (often unsafe for auth).",
+) -> Finding:
+    return Finding(
+        file_path=Path("demo.sol"),
+        line_number=7,
+        code=code,
+        severity="MEDIUM",
+        message=message,
+        line_text="address a = tx.origin;",
+    )
+
+
+def test_attach_hints_sets_suggestion_and_leaves_originals_alone() -> None:
+    original = _finding()
+    attached = attach_hints([original])
+    assert original.suggestion is None
+    assert len(attached) == 1
+    assert attached[0].suggestion == hint_for("A001", original.message)
+    assert attached[0].file_path == original.file_path
+    assert attached[0].line_number == original.line_number
+    assert attached[0].code == original.code
+    assert attached[0].message == original.message
+
+
+def test_attach_hints_uses_message_variants_and_overrides() -> None:
+    phishing = _finding(
+        "A014",
+        PHISHING_MSG,
+    )
+    unknown = _finding("A999", "mystery")
+    catalog = with_overrides(builtin_catalog(), {"A001": "Custom A001 hint."})
+    attached = attach_hints(
+        [_finding(), phishing, unknown],
+        catalog=catalog,
+    )
+    assert attached[0].suggestion == "Custom A001 hint."
+    assert attached[1].suggestion == hint_for("A014", PHISHING_MSG)
+    assert "phishing" in (attached[1].suggestion or "")
+    assert attached[2].suggestion == FALLBACK
+
+
+def test_attach_hints_empty_list() -> None:
+    assert attach_hints([]) == []
 
 
 def test_load_catalog_missing_file_raises(tmp_path: Path) -> None:

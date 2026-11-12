@@ -9,9 +9,12 @@ command fails or times out.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from collections.abc import Sequence
+from dataclasses import dataclass, replace
 from functools import lru_cache
 from pathlib import Path
+
+from .scanner import Finding
 
 FALLBACK = "Review this finding; no built-in hint for this rule code."
 
@@ -253,3 +256,16 @@ def load_catalog(path: Path) -> dict[str, str]:
             raise SuggestError(f"suggestion catalog entry {key!r} must be a non-empty string")
         overrides[key.strip().upper()] = value.strip()
     return overrides
+
+
+def attach_hints(
+    findings: Sequence[Finding],
+    catalog: Catalog | None = None,
+) -> list[Finding]:
+    """Return copies of ``findings`` with a local hint on each one."""
+    chosen = catalog if catalog is not None else builtin_catalog()
+    attached: list[Finding] = []
+    for finding in findings:
+        hint = hint_for(finding.code, finding.message, chosen)
+        attached.append(replace(finding, suggestion=hint))
+    return attached
