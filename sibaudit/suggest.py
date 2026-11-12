@@ -4,18 +4,29 @@ The catalog is the default source for ``sibaudit --suggest``. It never
 makes a network call. A JSON override file can replace individual hints;
 an optional local command can too, and the catalog is used if that
 command fails or times out.
+
+An opt-in ``local-llm`` backend can ask a model served on this machine
+(an Ollama-compatible ``/api/generate`` endpoint) for a hint tailored to
+the finding. That backend only talks to loopback addresses, so source
+code never leaves the machine, and any failure falls back to the catalog
+hint instead of breaking the scan.
 """
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import shlex
 import subprocess
-from collections.abc import Mapping, Sequence
+import urllib.error
+import urllib.request
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import urlparse
 
+from .rules import get_rule
 from .scanner import Finding
 
 COMMAND_TIMEOUT = 8.0
@@ -192,7 +203,7 @@ _HINTS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
 
 
 class SuggestError(ValueError):
-    """Raised when a suggestion catalog file cannot be read or does not match the schema."""
+    """Raised when a suggestion catalog or local-llm backend cannot be used."""
 
 
 @dataclass(frozen=True)
@@ -310,24 +321,125 @@ def run_local_hint(
     return None
 
 
+DEFAULT_LOCAL_URL = "http://127.0.0.1:11434"
+CONTEXT_LINES = 3
+MAX_SUGGESTION_CHARS = 400
+MODEL_TIMEOUT = 20.0
+
+Transport = Callable[[str, bytes, float], bytes]
+
+
+def require_loopback(url: str) -> str:
+    """Return ``url`` unchanged if it points at this machine, else raise SuggestError."""
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        raise SuggestError(f"invalid local model URL {url!r}")
+    host = parsed.hostname
+    if host != "localhost":
+        try:
+            is_loopback = ipaddress.ip_address(host).is_loopback
+        except ValueError as exc:
+            raise SuggestError(f"local model URL must be loopback, got host {host!r}") from exc
+        if not is_loopback:
+            raise SuggestError(f"local model URL must be loopback, got host {host!r}")
+    return url.rstrip("/")
+
+
+def build_prompt(finding: Finding, context: str) -> str:
+    rule = get_rule(finding.code)
+    rationale = rule.rationale if rule else ""
+    return "\n".join(
+        [
+            "You review Solidity code. Reply with one short fix suggestion (max two sentences).",
+            f"Rule {finding.code} ({finding.severity}): {finding.message}",
+            f"Why it matters: {rationale}",
+            f"Flagged line {finding.line_number}:",
+            context,
+        ]
+    )
+
+
+def read_context(finding: Finding, radius: int = CONTEXT_LINES) -> str:
+    """A few numbered source lines around the finding, or the line text alone."""
+    try:
+        lines = Path(finding.file_path).read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError):
+        return finding.line_text
+    start = max(finding.line_number - 1 - radius, 0)
+    end = min(finding.line_number + radius, len(lines))
+    return "\n".join(f"{n + 1:>4}: {lines[n]}" for n in range(start, end))
+
+
+def _http_post(url: str, body: bytes, timeout: float) -> bytes:
+    req = urllib.request.Request(
+        url, data=body, headers={"Content-Type": "application/json"}, method="POST"
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:  # URL checked by require_loopback
+        return resp.read()
+
+
+class LocalModelSuggester:
+    """Ask a model on this machine for a hint; return None on failure so callers can fall back."""
+
+    def __init__(
+        self,
+        model: str,
+        url: str = DEFAULT_LOCAL_URL,
+        timeout: float = MODEL_TIMEOUT,
+        transport: Transport = _http_post,
+    ) -> None:
+        if not model:
+            raise SuggestError("a model name is required for the local-llm backend")
+        self.model = model
+        self.endpoint = require_loopback(url) + "/api/generate"
+        self.timeout = timeout
+        self._transport = transport
+        self.failures = 0
+
+    def suggest(self, finding: Finding) -> str | None:
+        prompt = build_prompt(finding, read_context(finding))
+        body = json.dumps({"model": self.model, "prompt": prompt, "stream": False}).encode()
+        try:
+            raw = self._transport(self.endpoint, body, self.timeout)
+            text = str(json.loads(raw).get("response", "")).strip()
+        except (OSError, urllib.error.URLError, ValueError, AttributeError):
+            text = ""
+        if not text:
+            self.failures += 1
+            return None
+        text = " ".join(text.split())
+        if len(text) > MAX_SUGGESTION_CHARS:
+            text = text[: MAX_SUGGESTION_CHARS - 3].rstrip() + "..."
+        return text
+
+
 def attach_hints(
     findings: Sequence[Finding],
     catalog: Catalog | None = None,
     command: str | None = None,
     timeout: float = COMMAND_TIMEOUT,
+    model: LocalModelSuggester | None = None,
 ) -> list[Finding]:
     """Return copies of ``findings`` with a local hint on each one.
 
-    If ``command`` is set, it is tried first. The catalog hint is used when
-    the command is unset, fails, times out, or prints nothing.
+    If ``model`` is set, it is tried first. If ``command`` is set, it is
+    tried next. The catalog hint is used when those are unset, fail,
+    time out, or print nothing.
     """
     chosen = catalog if catalog is not None else builtin_catalog()
     attached: list[Finding] = []
     for finding in findings:
         hint = hint_for(finding.code, finding.message, chosen)
-        if command:
+        source = "catalog"
+        if model is not None:
+            text = model.suggest(finding)
+            if text:
+                hint = text
+                source = "local-llm"
+        if source == "catalog" and command:
             local = run_local_hint(command, finding_payload(finding), timeout=timeout)
             if local:
                 hint = local
-        attached.append(replace(finding, suggestion=hint))
+                source = "command"
+        attached.append(replace(finding, suggestion=hint, suggestion_source=source))
     return attached

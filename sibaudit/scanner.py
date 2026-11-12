@@ -242,6 +242,7 @@ class Finding:
     message: str
     line_text: str
     suggestion: str | None = None
+    suggestion_source: str | None = None
 
 
 @dataclass(frozen=True)
