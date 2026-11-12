@@ -11,11 +11,14 @@ from sibaudit.rules import RULES
 from sibaudit.scanner import Finding
 from sibaudit.suggest import (
     FALLBACK,
+    LocalModelSuggester,
     SuggestError,
     attach_hints,
     builtin_catalog,
     hint_for,
     load_catalog,
+    read_context,
+    require_loopback,
     run_local_hint,
     with_overrides,
 )
@@ -142,6 +145,7 @@ def test_attach_hints_sets_suggestion_and_leaves_originals_alone() -> None:
     assert original.suggestion is None
     assert len(attached) == 1
     assert attached[0].suggestion == hint_for("A001", original.message)
+    assert attached[0].suggestion_source == "catalog"
     assert attached[0].file_path == original.file_path
     assert attached[0].line_number == original.line_number
     assert attached[0].code == original.code
@@ -222,8 +226,10 @@ def test_attach_hints_prefers_local_command_then_catalog() -> None:
     catalog_hint = hint_for("A001", finding.message)
     ok = attach_hints([finding], command=_py_cmd("print('cmd wins')"))
     assert ok[0].suggestion == "cmd wins"
+    assert ok[0].suggestion_source == "command"
     failed = attach_hints([finding], command=_py_cmd("raise SystemExit(2)"))
     assert failed[0].suggestion == catalog_hint
+    assert failed[0].suggestion_source == "catalog"
     silent = attach_hints([finding], command=_py_cmd("pass"))
     assert silent[0].suggestion == catalog_hint
 
@@ -244,3 +250,133 @@ def test_sample_catalog_and_local_script_are_usable() -> None:
     assert from_script == loaded["A001"]
     fallback = run_local_hint(cmd, {"code": "A003", "message": "demo"})
     assert fallback is None
+
+
+@pytest.mark.parametrize("url", ["http://127.0.0.1:11434", "http://localhost:1/", "http://[::1]:8"])
+def test_loopback_urls_are_accepted(url: str) -> None:
+    assert require_loopback(url) == url.rstrip("/")
+
+
+@pytest.mark.parametrize(
+    "url", ["http://example.com", "http://10.0.0.5:11434", "ftp://127.0.0.1", "not a url"]
+)
+def test_non_loopback_urls_are_rejected(url: str) -> None:
+    with pytest.raises(SuggestError):
+        require_loopback(url)
+
+
+def test_read_context_numbers_lines_around_finding(tmp_path: Path) -> None:
+    src = tmp_path / "c.sol"
+    src.write_text("\n".join(f"line{i}" for i in range(1, 11)), encoding="utf-8")
+    finding = Finding(
+        file_path=src,
+        line_number=5,
+        code="A001",
+        severity="MEDIUM",
+        message="msg",
+        line_text="line5",
+    )
+    ctx = read_context(finding, radius=1)
+    assert ctx.splitlines() == ["   4: line4", "   5: line5", "   6: line6"]
+    missing = Finding(
+        file_path=tmp_path / "missing.sol",
+        line_number=1,
+        code="A001",
+        severity="MEDIUM",
+        message="msg",
+        line_text="emit Seen(tx.origin);",
+    )
+    assert read_context(missing) == "emit Seen(tx.origin);"
+
+
+def test_local_model_answer_is_used_and_prompt_has_context(tmp_path: Path) -> None:
+    src = tmp_path / "c.sol"
+    src.write_text("contract C {\n  function f() external {\n    emit Seen(tx.origin);\n  }\n}\n")
+    finding = Finding(
+        file_path=src,
+        line_number=3,
+        code="A001",
+        severity="MEDIUM",
+        message="Potential risky use of tx.origin (often unsafe for auth).",
+        line_text="    emit Seen(tx.origin);",
+    )
+    seen: dict[str, object] = {}
+
+    def transport(url: str, body: bytes, timeout: float) -> bytes:
+        seen["url"] = url
+        seen["payload"] = json.loads(body)
+        return json.dumps({"response": "  Use   msg.sender here.\n"}).encode()
+
+    sug = LocalModelSuggester("tiny", transport=transport)
+    attached = attach_hints([finding], model=sug)
+    assert attached[0].suggestion_source == "local-llm"
+    assert attached[0].suggestion == "Use msg.sender here."
+    assert seen["url"] == "http://127.0.0.1:11434/api/generate"
+    payload = seen["payload"]
+    assert isinstance(payload, dict)
+    assert payload["model"] == "tiny" and payload["stream"] is False
+    assert "emit Seen(tx.origin);" in payload["prompt"]
+    assert sug.failures == 0
+
+
+@pytest.mark.parametrize("reply", [b"not json", b"{}", b'{"response": "  "}', b"[1, 2]"])
+def test_bad_model_reply_falls_back_to_catalog(reply: bytes) -> None:
+    finding = _finding()
+    sug = LocalModelSuggester("tiny", transport=lambda u, b, t: reply)
+    attached = attach_hints([finding], model=sug)
+    assert attached[0].suggestion_source == "catalog"
+    assert attached[0].suggestion == hint_for(finding.code, finding.message)
+    assert sug.failures == 1
+
+
+def test_unreachable_model_falls_back_to_catalog() -> None:
+    def transport(url: str, body: bytes, timeout: float) -> bytes:
+        raise ConnectionRefusedError
+
+    sug = LocalModelSuggester("tiny", transport=transport)
+    attached = attach_hints([_finding()], model=sug)
+    assert attached[0].suggestion_source == "catalog"
+    assert sug.failures == 1
+
+
+def test_long_model_reply_is_truncated() -> None:
+    long = json.dumps({"response": "word " * 500}).encode()
+    sug = LocalModelSuggester("tiny", transport=lambda u, b, t: long)
+    attached = attach_hints([_finding()], model=sug)
+    assert attached[0].suggestion is not None
+    assert len(attached[0].suggestion) <= 400
+    assert attached[0].suggestion.endswith("...")
+    assert attached[0].suggestion_source == "local-llm"
+
+
+def test_local_model_requires_a_name() -> None:
+    with pytest.raises(SuggestError, match="model name"):
+        LocalModelSuggester("")
+
+
+def test_attach_hints_prefers_model_then_command_then_catalog() -> None:
+    finding = _finding()
+    catalog_hint = hint_for("A001", finding.message)
+    ok_model = LocalModelSuggester(
+        "tiny", transport=lambda u, b, t: json.dumps({"response": "from model"}).encode()
+    )
+    ok = attach_hints(
+        [finding], command=_py_cmd("print('from cmd')"), model=ok_model
+    )
+    assert ok[0].suggestion == "from model"
+    assert ok[0].suggestion_source == "local-llm"
+
+    bad_model = LocalModelSuggester("tiny", transport=lambda u, b, t: b"{}")
+    mid = attach_hints(
+        [finding], command=_py_cmd("print('from cmd')"), model=bad_model
+    )
+    assert mid[0].suggestion == "from cmd"
+    assert mid[0].suggestion_source == "command"
+
+    both_bad = attach_hints(
+        [finding],
+        command=_py_cmd("raise SystemExit(1)"),
+        model=LocalModelSuggester("tiny", transport=lambda u, b, t: b"{}"),
+    )
+    assert both_bad[0].suggestion == catalog_hint
+    assert both_bad[0].suggestion_source == "catalog"

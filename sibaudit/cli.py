@@ -8,7 +8,15 @@ from .baseline import BaselineError, apply_baseline, load_baseline, write_baseli
 from .report import format_github_annotations, format_summary
 from .rules import format_explain, format_rule_list, get_rule
 from .scanner import Finding, scan_paths
-from .suggest import SuggestError, attach_hints, builtin_catalog, load_catalog, with_overrides
+from .suggest import (
+    DEFAULT_LOCAL_URL,
+    LocalModelSuggester,
+    SuggestError,
+    attach_hints,
+    builtin_catalog,
+    load_catalog,
+    with_overrides,
+)
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -96,6 +104,28 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
             "Implies --suggest."
         ),
     )
+    parser.add_argument(
+        "--suggest-backend",
+        choices=["catalog", "local-llm"],
+        default="catalog",
+        help=(
+            "Where suggestions come from: 'catalog' (default, built-in or "
+            "--suggest-catalog hints) or 'local-llm' (a model served on this "
+            "machine; falls back to the catalog)."
+        ),
+    )
+    parser.add_argument(
+        "--llm-model",
+        metavar="NAME",
+        default=None,
+        help="Model name for --suggest-backend local-llm.",
+    )
+    parser.add_argument(
+        "--llm-url",
+        metavar="URL",
+        default=None,
+        help="Loopback URL of the local model server (default: http://127.0.0.1:11434).",
+    )
     return parser.parse_args(argv)
 
 
@@ -124,6 +154,12 @@ def main(argv: list[str] | None = None) -> None:
         write_baseline(Path(ns.write_baseline), findings, root)
     if entries:
         findings = apply_baseline(findings, entries, root)
+    if (ns.llm_model or ns.llm_url) and ns.suggest_backend != "local-llm":
+        print(
+            "error: --llm-model and --llm-url require --suggest-backend local-llm",
+            file=sys.stderr,
+        )
+        sys.exit(2)
     catalog = builtin_catalog()
     if ns.suggest_catalog:
         try:
@@ -131,8 +167,23 @@ def main(argv: list[str] | None = None) -> None:
         except SuggestError as exc:
             print(f"error: {exc}", file=sys.stderr)
             sys.exit(2)
-    if ns.suggest or ns.suggest_catalog or ns.suggest_cmd:
-        findings = attach_hints(findings, catalog=catalog, command=ns.suggest_cmd)
+    model: LocalModelSuggester | None = None
+    if ns.suggest_backend == "local-llm":
+        try:
+            model = LocalModelSuggester(ns.llm_model or "", ns.llm_url or DEFAULT_LOCAL_URL)
+        except SuggestError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            sys.exit(2)
+    if ns.suggest or ns.suggest_catalog or ns.suggest_cmd or model is not None:
+        findings = attach_hints(
+            findings, catalog=catalog, command=ns.suggest_cmd, model=model
+        )
+        if model is not None and model.failures:
+            print(
+                "note: local model gave no answer for "
+                f"{model.failures} finding(s); used catalog hints",
+                file=sys.stderr,
+            )
     _print_findings(findings, ns.format)
     # Exit non-zero if any findings
     sys.exit(1 if findings else 0)
@@ -152,6 +203,8 @@ def _print_findings(findings: list[Finding], fmt: str) -> None:
             }
             if f.suggestion:
                 record["suggestion"] = f.suggestion
+                if f.suggestion_source:
+                    record["suggestion_source"] = f.suggestion_source
             print(json.dumps(record, ensure_ascii=False))
         return
     if fmt == "github":
