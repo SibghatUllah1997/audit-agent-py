@@ -8,7 +8,7 @@ from .baseline import BaselineError, apply_baseline, load_baseline, write_baseli
 from .report import format_github_annotations, format_summary
 from .rules import format_explain, format_rule_list, get_rule
 from .scanner import Finding, scan_paths
-from .suggest import attach_hints
+from .suggest import SuggestError, attach_hints, builtin_catalog, load_catalog, with_overrides
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -76,6 +76,26 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
             "Works fully offline; nothing is sent over the network."
         ),
     )
+    parser.add_argument(
+        "--suggest-catalog",
+        metavar="FILE",
+        default=None,
+        help=(
+            "JSON object mapping rule codes to custom hints. Implies --suggest. "
+            "Overrides the built-in catalog for those codes."
+        ),
+    )
+    parser.add_argument(
+        "--suggest-cmd",
+        metavar="CMD",
+        default=None,
+        help=(
+            "Optional local command. Each finding is written as one JSON object "
+            "on stdin; the first non-empty stdout line becomes the hint. If the "
+            "command fails or times out, the catalog hint is used instead. "
+            "Implies --suggest."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -104,8 +124,15 @@ def main(argv: list[str] | None = None) -> None:
         write_baseline(Path(ns.write_baseline), findings, root)
     if entries:
         findings = apply_baseline(findings, entries, root)
-    if ns.suggest:
-        findings = attach_hints(findings)
+    catalog = builtin_catalog()
+    if ns.suggest_catalog:
+        try:
+            catalog = with_overrides(catalog, load_catalog(Path(ns.suggest_catalog)))
+        except SuggestError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            sys.exit(2)
+    if ns.suggest or ns.suggest_catalog or ns.suggest_cmd:
+        findings = attach_hints(findings, catalog=catalog, command=ns.suggest_cmd)
     _print_findings(findings, ns.format)
     # Exit non-zero if any findings
     sys.exit(1 if findings else 0)

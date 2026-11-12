@@ -1,0 +1,4 @@
+{
+  "A001": "Project convention: new code must use msg.sender, never tx.origin.",
+  "A008": "Update balances before the call; add a nonReentrant modifier if the function stays complex."
+}

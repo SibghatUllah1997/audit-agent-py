@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import shlex
+import sys
 from pathlib import Path
 
 import pytest
@@ -14,6 +16,7 @@ from sibaudit.suggest import (
     builtin_catalog,
     hint_for,
     load_catalog,
+    run_local_hint,
     with_overrides,
 )
 
@@ -187,3 +190,57 @@ def test_load_catalog_rejects_invalid_json_and_schema(tmp_path: Path) -> None:
     empty_hint.write_text(json.dumps({"A001": "  "}))
     with pytest.raises(SuggestError, match="non-empty string"):
         load_catalog(empty_hint)
+
+
+def _py_cmd(source: str) -> str:
+    return f"{shlex.quote(sys.executable)} -c {shlex.quote(source)}"
+
+
+def test_run_local_hint_returns_first_stdout_line() -> None:
+    payload = {"code": "A001", "message": "demo"}
+    cmd = _py_cmd("import json,sys; print('  from cmd  '); print('ignored')")
+    assert run_local_hint(cmd, payload) == "from cmd"
+
+
+def test_run_local_hint_falls_back_on_failure_timeout_and_empty() -> None:
+    payload = {"code": "A001"}
+    failing = _py_cmd("raise SystemExit(1)")
+    empty = _py_cmd("pass")
+    sleepy = _py_cmd("import time; time.sleep(5)")
+    broken = "this-command-does-not-exist-sibaudit-xyz"
+    quoted_badly = "python3 'unterminated"
+    assert run_local_hint(failing, payload) is None
+    assert run_local_hint(empty, payload) is None
+    assert run_local_hint(sleepy, payload, timeout=0.2) is None
+    assert run_local_hint(broken, payload) is None
+    assert run_local_hint(quoted_badly, payload) is None
+    assert run_local_hint("", payload) is None
+
+
+def test_attach_hints_prefers_local_command_then_catalog() -> None:
+    finding = _finding()
+    catalog_hint = hint_for("A001", finding.message)
+    ok = attach_hints([finding], command=_py_cmd("print('cmd wins')"))
+    assert ok[0].suggestion == "cmd wins"
+    failed = attach_hints([finding], command=_py_cmd("raise SystemExit(2)"))
+    assert failed[0].suggestion == catalog_hint
+    silent = attach_hints([finding], command=_py_cmd("pass"))
+    assert silent[0].suggestion == catalog_hint
+
+
+def test_sample_catalog_and_local_script_are_usable() -> None:
+    root = Path(__file__).resolve().parents[1]
+    catalog_path = root / "examples" / "suggest" / "catalog.json"
+    script = root / "examples" / "suggest" / "local-hint.py"
+    loaded = load_catalog(catalog_path)
+    assert "A001" in loaded and "A008" in loaded
+    catalog = with_overrides(builtin_catalog(), loaded)
+    assert hint_for("A001", catalog=catalog) == loaded["A001"]
+    # Codes not in the file keep the built-in text.
+    assert hint_for("A003", catalog=catalog) == hint_for("A003")
+
+    cmd = f"{shlex.quote(sys.executable)} {shlex.quote(str(script))}"
+    from_script = run_local_hint(cmd, {"code": "A001", "message": "demo"})
+    assert from_script == loaded["A001"]
+    fallback = run_local_hint(cmd, {"code": "A003", "message": "demo"})
+    assert fallback is None

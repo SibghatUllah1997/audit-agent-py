@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import shlex
+import sys
 from pathlib import Path
 
 import pytest
@@ -101,3 +103,53 @@ def test_suggest_on_clean_file_prints_nothing(
         main([str(sol), "--suggest"])
     assert clean.value.code == 0
     assert capsys.readouterr().out == ""
+
+
+def test_suggest_catalog_overrides_builtin_without_flag(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    sol = tmp_path / "Token.sol"
+    sol.write_text(RISKY)
+    catalog = tmp_path / "hints.json"
+    catalog.write_text(json.dumps({"A001": "Custom catalog hint."}))
+    with pytest.raises(SystemExit) as shown:
+        main([str(sol), "--suggest-catalog", str(catalog)])
+    assert shown.value.code == 1
+    out = capsys.readouterr().out
+    assert "hint: Custom catalog hint." in out
+    assert hint_for("A001") not in out
+
+
+def test_missing_suggest_catalog_exits_two(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    sol = tmp_path / "Token.sol"
+    sol.write_text(RISKY)
+    missing = tmp_path / "nope.json"
+    with pytest.raises(SystemExit) as failed:
+        main([str(sol), "--suggest-catalog", str(missing)])
+    assert failed.value.code == 2
+    captured = capsys.readouterr()
+    assert "not found" in captured.err
+    assert captured.out == ""
+
+
+def _py_cmd(source: str) -> str:
+    return f"{shlex.quote(sys.executable)} -c {shlex.quote(source)}"
+
+
+def test_suggest_cmd_overrides_and_falls_back(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    sol = tmp_path / "Token.sol"
+    sol.write_text(RISKY)
+    builtin = hint_for("A001", "Potential risky use of tx.origin (often unsafe for auth).")
+
+    with pytest.raises(SystemExit):
+        main([str(sol), "--suggest-cmd", _py_cmd('print("from local cmd")')])
+    assert "hint: from local cmd" in capsys.readouterr().out
+
+    with pytest.raises(SystemExit):
+        main([str(sol), "--suggest-cmd", _py_cmd("raise SystemExit(1)")])
+    assert f"hint: {builtin}" in capsys.readouterr().out
+

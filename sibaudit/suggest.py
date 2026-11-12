@@ -9,12 +9,16 @@ command fails or times out.
 from __future__ import annotations
 
 import json
-from collections.abc import Sequence
+import shlex
+import subprocess
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from functools import lru_cache
 from pathlib import Path
 
 from .scanner import Finding
+
+COMMAND_TIMEOUT = 8.0
 
 FALLBACK = "Review this finding; no built-in hint for this rule code."
 
@@ -258,14 +262,72 @@ def load_catalog(path: Path) -> dict[str, str]:
     return overrides
 
 
+def finding_payload(finding: Finding) -> dict[str, object]:
+    """JSON object written to a local ``--suggest-cmd`` on stdin."""
+    return {
+        "file_path": str(finding.file_path),
+        "line_number": finding.line_number,
+        "code": finding.code,
+        "severity": finding.severity,
+        "message": finding.message,
+        "line_text": finding.line_text,
+    }
+
+
+def run_local_hint(
+    command: str,
+    payload: Mapping[str, object],
+    timeout: float = COMMAND_TIMEOUT,
+) -> str | None:
+    """Run ``command`` with ``payload`` as JSON on stdin.
+
+    Returns the first non-empty stdout line, or ``None`` on any failure so
+    the caller can fall back to the catalog. Never uses a shell.
+    """
+    try:
+        args = shlex.split(command)
+    except ValueError:
+        return None
+    if not args:
+        return None
+    try:
+        proc = subprocess.run(
+            args,
+            input=json.dumps(payload, ensure_ascii=False),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if proc.returncode != 0:
+        return None
+    for line in proc.stdout.splitlines():
+        stripped = line.strip()
+        if stripped:
+            return stripped
+    return None
+
+
 def attach_hints(
     findings: Sequence[Finding],
     catalog: Catalog | None = None,
+    command: str | None = None,
+    timeout: float = COMMAND_TIMEOUT,
 ) -> list[Finding]:
-    """Return copies of ``findings`` with a local hint on each one."""
+    """Return copies of ``findings`` with a local hint on each one.
+
+    If ``command`` is set, it is tried first. The catalog hint is used when
+    the command is unset, fails, times out, or prints nothing.
+    """
     chosen = catalog if catalog is not None else builtin_catalog()
     attached: list[Finding] = []
     for finding in findings:
         hint = hint_for(finding.code, finding.message, chosen)
+        if command:
+            local = run_local_hint(command, finding_payload(finding), timeout=timeout)
+            if local:
+                hint = local
         attached.append(replace(finding, suggestion=hint))
     return attached
