@@ -108,9 +108,11 @@ Token.sol:7: A001 Potential risky use of tx.origin (often unsafe for auth).
     hint: Prefer msg.sender for identity and authorization; tx.origin trusts every contract in the call chain.
 ```
 
-- `--format json` adds a `suggestion` field. `--format github` appends the hint after an em dash. `--format summary` lists unique hints under each rule.
+- `--format json` adds a `suggestion` field and a `suggestion_source` (`catalog`, `command`, or `local-llm`). `--format github` appends the hint after an em dash. `--format summary` lists unique hints under each rule.
 - `--suggest-catalog FILE` is a JSON object of `{ "A001": "your hint", ... }` and implies `--suggest`. Codes you omit keep the built-in text.
 - `--suggest-cmd CMD` runs a local command once per finding. The finding is written as one JSON object on stdin (`file_path`, `line_number`, `code`, `severity`, `message`, `line_text`). The first non-empty stdout line becomes the hint. If the command fails, times out, or prints nothing, the catalog hint is used instead.
+- `--suggest-backend local-llm --llm-model NAME` asks a model served on this machine through an Ollama-compatible `/api/generate` endpoint (default `http://127.0.0.1:11434`, change with `--llm-url`). Only loopback URLs are accepted, so source code never leaves the machine. If the model is down or replies with nothing useful, that finding gets the catalog hint and a note is printed to stderr.
+- Suggestions are hints for a human reviewer, not patches; nothing is rewritten.
 - A sample catalog and a sample command live in `examples/suggest/`.
 
 JSON output
@@ -129,6 +131,7 @@ Each line is a JSON object with:
 - `severity` (string: `LOW` | `MEDIUM` | `HIGH`)
 - `message` (string)
 - `suggestion` (string, only when `--suggest` is on)
+- `suggestion_source` (string: `catalog` | `command` | `local-llm`, only when `--suggest` is on)
 
 Include and exclude files
 

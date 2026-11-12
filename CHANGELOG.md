@@ -3,6 +3,7 @@
 ## 2026-11-12
 - Added `--suggest` so each finding can carry a local fix hint from a built-in catalog that never talks to the network.
 - Hints can be overridden with `--suggest-catalog` or a local `--suggest-cmd`; the catalog is used if the command fails.
+- Added an opt-in `--suggest-backend local-llm` that asks a model on this machine (Ollama-compatible API) for a tailored hint; only loopback URLs are allowed and any failure falls back to the catalog hint.
 - Marked days 1 and 30 complete on the roadmap.
 
 ## 2026-11-11
