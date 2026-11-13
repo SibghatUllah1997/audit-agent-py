@@ -31,3 +31,21 @@
 - [x] Day 29: Add doc examples for each rule with rationale
 - [x] Day 30: Optional LLM-assisted suggestions (offline/local first)
 
+# Phase 2
+
+More rules and scanner UX, still one small shippable step per day. Keep the analyzer heuristic and dependency-free unless a step explicitly adds a library.
+
+- [ ] Day 31: Add `sibaudit.toml` / `pyproject` config for enabling, disabling, and setting severity of rules
+- [ ] Day 32: Add `--min-severity` and `--only` / `--except` CLI filters, honored by the existing GitHub Action too
+- [ ] Day 33: Add a file-level `// sibaudit:ignore-file` directive and honor it in the scanner
+- [ ] Day 34: Add rule A021: `ecrecover` without a zero-address / identity check on the recovered signer
+- [ ] Day 35: Add rule A022: ether `transfer`/`send` (2300-gas stipend) used instead of `call`
+- [ ] Day 36: Add rule A023: floating Solidity pragma (`^` / `>=`) in production sources
+- [ ] Day 37: Add rule A024: hash collisions from `abi.encodePacked` of dynamic types
+- [ ] Day 38: Add rule A025: upgradeable initializer left public, or `_disableInitializers` missing in the constructor
+- [ ] Day 39: Add rule A026: signature-replay risk (signed data missing nonce, deadline, or chain id)
+- [ ] Day 40: Add rule A027: `extcodesize == 0` used as an EOA check (breaks under constructor and EIP-7702)
+- [ ] Day 41: Discover Foundry and Hardhat layouts (`src/`, `contracts/`) when a directory is scanned with no paths
+- [ ] Day 42: Add an HTML summary report and a `--fail-on` exit policy (for example, fail only on high)
+- [ ] Day 43: Add a baseline auto-update command that records current findings without hiding new ones later
+- [ ] Day 44: Tag v0.2.0 and publish a rule catalog with examples for A021–A027
