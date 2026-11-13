@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .baseline import BaselineError, apply_baseline, load_baseline, write_baseline
 from .config import ConfigError, apply_config, find_and_load_config, load_config
+from .filters import FilterError, apply_filters, parse_codes, parse_severity
 from .report import format_github_annotations, format_summary
 from .rules import format_explain, format_rule_list, get_rule
 from .scanner import Finding, scan_paths
@@ -62,6 +63,27 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
             "TOML config that enables, disables, or sets severity of rules. "
             "Default: nearest sibaudit.toml or [tool.sibaudit] in pyproject.toml."
         ),
+    )
+    parser.add_argument(
+        "--min-severity",
+        metavar="LEVEL",
+        default=None,
+        help="Hide findings below this severity (LOW, MEDIUM, or HIGH).",
+    )
+    parser.add_argument(
+        "--only",
+        action="append",
+        default=[],
+        metavar="CODE",
+        help="Only report these rule codes (repeatable, comma-separated).",
+    )
+    parser.add_argument(
+        "--except",
+        dest="except_codes",
+        action="append",
+        default=[],
+        metavar="CODE",
+        help="Skip these rule codes (repeatable, comma-separated).",
     )
     parser.add_argument(
         "--baseline",
@@ -158,6 +180,16 @@ def main(argv: list[str] | None = None) -> None:
         sys.exit(2)
     findings = scan_paths(ns.paths, include=ns.include, exclude=ns.exclude)
     findings = apply_config(findings, config)
+    try:
+        findings = apply_filters(
+            findings,
+            min_severity=parse_severity(ns.min_severity),
+            only=parse_codes(ns.only),
+            except_codes=parse_codes(ns.except_codes),
+        )
+    except FilterError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        sys.exit(2)
     root = Path.cwd().resolve()
     entries = []
     if ns.baseline:
