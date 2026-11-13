@@ -37,7 +37,7 @@ More rules and scanner UX, still one small shippable step per day. Keep the anal
 
 - [x] Day 31: Add `sibaudit.toml` / `pyproject` config for enabling, disabling, and setting severity of rules
 - [x] Day 32: Add `--min-severity` and `--only` / `--except` CLI filters, honored by the existing GitHub Action too
-- [ ] Day 33: Add a file-level `// sibaudit:ignore-file` directive and honor it in the scanner
+- [x] Day 33: Add a file-level `// sibaudit:ignore-file` directive and honor it in the scanner
 - [ ] Day 34: Add rule A021: `ecrecover` without a zero-address / identity check on the recovered signer
 - [ ] Day 35: Add rule A022: ether `transfer`/`send` (2300-gas stipend) used instead of `call`
 - [ ] Day 36: Add rule A023: floating Solidity pragma (`^` / `>=`) in production sources

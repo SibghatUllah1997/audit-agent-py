@@ -287,6 +287,19 @@ Add the following directive on a line to ignore the very next line (for all rule
 address a = tx.origin; // this line will be ignored
 ```
 
+Ignoring a whole file
+
+Put `// sibaudit:ignore-file` in the file header (before the first contract, next to the SPDX line, `pragma`, or `import`s) to skip the file. Add rule codes to skip only those rules:
+
+```solidity
+// SPDX-License-Identifier: MIT
+// sibaudit:ignore-file A017, A005
+pragma solidity ^0.8.20;
+```
+
+- A directive below the first line of code, or inside a `/* ... */` block, is not honored.
+- Other text on the directive line is not allowed, so a stray comment cannot silence a file by accident.
+
 Testing
 - Lint with ruff; tests use pytest.
 - Run:
