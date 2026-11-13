@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 from .baseline import BaselineError, apply_baseline, load_baseline, write_baseline
+from .config import ConfigError, apply_config, find_and_load_config, load_config
 from .report import format_github_annotations, format_summary
 from .rules import format_explain, format_rule_list, get_rule
 from .scanner import Finding, scan_paths
@@ -52,6 +53,15 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         default=[],
         metavar="GLOB",
         help="Skip files matching this glob (repeatable); wins over --include.",
+    )
+    parser.add_argument(
+        "--config",
+        metavar="FILE",
+        default=None,
+        help=(
+            "TOML config that enables, disables, or sets severity of rules. "
+            "Default: nearest sibaudit.toml or [tool.sibaudit] in pyproject.toml."
+        ),
     )
     parser.add_argument(
         "--baseline",
@@ -141,7 +151,13 @@ def main(argv: list[str] | None = None) -> None:
             sys.exit(2)
         print(format_explain(rule))
         sys.exit(0)
+    try:
+        config = load_config(Path(ns.config)) if ns.config else find_and_load_config(Path.cwd())
+    except ConfigError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        sys.exit(2)
     findings = scan_paths(ns.paths, include=ns.include, exclude=ns.exclude)
+    findings = apply_config(findings, config)
     root = Path.cwd().resolve()
     entries = []
     if ns.baseline:
