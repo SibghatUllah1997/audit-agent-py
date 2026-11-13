@@ -41,6 +41,19 @@ def test_workflow_scan_step_uses_github_format() -> None:
     assert "--format summary" not in text
 
 
+def test_workflow_honors_filter_env_vars() -> None:
+    text = workflow_text()
+    assert "SIBAUDIT_MIN_SEVERITY: ${{ vars.SIBAUDIT_MIN_SEVERITY }}" in text
+    assert "SIBAUDIT_ONLY: ${{ vars.SIBAUDIT_ONLY }}" in text
+    assert "SIBAUDIT_EXCEPT: ${{ vars.SIBAUDIT_EXCEPT }}" in text
+    # The command stays flag-free so the Action picks filters up from env.
+    scan_lines = [
+        ln for ln in text.splitlines() if "python3 -m sibaudit --format github" in ln
+    ]
+    assert scan_lines
+    assert all("--min-severity" not in ln and "--only" not in ln for ln in scan_lines)
+
+
 def test_github_format_matches_workflow_annotation_shape() -> None:
     proc = subprocess.run(
         [sys.executable, "-m", "sibaudit", "--format", "github", str(SAMPLE)],

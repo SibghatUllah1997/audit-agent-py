@@ -129,3 +129,64 @@ def test_only_of_absent_code_exits_zero(
         main([str(sol), "--only", "A010"])
     assert none_left.value.code == 0
     assert capsys.readouterr().out == ""
+
+
+def test_env_min_severity_filters(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sol = _sol(tmp_path)
+    monkeypatch.setenv("SIBAUDIT_MIN_SEVERITY", "HIGH")
+    with pytest.raises(SystemExit) as clean:
+        main([str(sol), "--format", "json"])
+    assert clean.value.code == 0
+    assert capsys.readouterr().out == ""
+
+
+def test_env_only_filters(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sol = _sol(tmp_path)
+    monkeypatch.setenv("SIBAUDIT_ONLY", "A001")
+    with pytest.raises(SystemExit) as shown:
+        main([str(sol), "--format", "json"])
+    assert shown.value.code == 1
+    assert _codes(capsys) == {"A001"}
+
+
+def test_env_except_filters(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sol = _sol(tmp_path)
+    monkeypatch.setenv("SIBAUDIT_EXCEPT", "A002")
+    with pytest.raises(SystemExit):
+        main([str(sol), "--format", "json"])
+    codes = _codes(capsys)
+    assert "A001" in codes
+    assert "A002" not in codes
+
+
+def test_cli_flags_override_env(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sol = _sol(tmp_path)
+    monkeypatch.setenv("SIBAUDIT_ONLY", "A002")
+    monkeypatch.setenv("SIBAUDIT_MIN_SEVERITY", "HIGH")
+    with pytest.raises(SystemExit) as shown:
+        main([str(sol), "--format", "json", "--only", "A001", "--min-severity", "LOW"])
+    assert shown.value.code == 1
+    assert _codes(capsys) == {"A001"}
+
+
+def test_blank_env_is_ignored(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sol = _sol(tmp_path)
+    monkeypatch.setenv("SIBAUDIT_MIN_SEVERITY", "  ")
+    monkeypatch.setenv("SIBAUDIT_ONLY", "")
+    monkeypatch.setenv("SIBAUDIT_EXCEPT", "")
+    with pytest.raises(SystemExit) as shown:
+        main([str(sol), "--format", "json"])
+    assert shown.value.code == 1
+    codes = _codes(capsys)
+    assert "A001" in codes
+    assert "A002" in codes

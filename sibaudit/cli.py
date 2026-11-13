@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -183,9 +184,9 @@ def main(argv: list[str] | None = None) -> None:
     try:
         findings = apply_filters(
             findings,
-            min_severity=parse_severity(ns.min_severity),
-            only=parse_codes(ns.only),
-            except_codes=parse_codes(ns.except_codes),
+            min_severity=parse_severity(ns.min_severity or os.environ.get("SIBAUDIT_MIN_SEVERITY")),
+            only=parse_codes(_flag_or_env(ns.only, "SIBAUDIT_ONLY")),
+            except_codes=parse_codes(_flag_or_env(ns.except_codes, "SIBAUDIT_EXCEPT")),
         )
     except FilterError as exc:
         print(f"error: {exc}", file=sys.stderr)
@@ -235,6 +236,14 @@ def main(argv: list[str] | None = None) -> None:
     _print_findings(findings, ns.format)
     # Exit non-zero if any findings
     sys.exit(1 if findings else 0)
+
+
+def _flag_or_env(flag_values: list[str], env_name: str) -> list[str]:
+    """CLI flags win; otherwise a comma-separated environment value is used."""
+    if flag_values:
+        return flag_values
+    value = os.environ.get(env_name, "").strip()
+    return [value] if value else []
 
 
 def _print_findings(findings: list[Finding], fmt: str) -> None:

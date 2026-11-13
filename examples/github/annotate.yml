@@ -26,4 +26,12 @@ jobs:
           pip install sibaudit
 
       - name: Scan Solidity files
+        env:
+          # Optional repository variables. Empty means "no filter".
+          # SIBAUDIT_MIN_SEVERITY: HIGH | MEDIUM | LOW
+          # SIBAUDIT_ONLY: A008,A009
+          # SIBAUDIT_EXCEPT: A017
+          SIBAUDIT_MIN_SEVERITY: ${{ vars.SIBAUDIT_MIN_SEVERITY }}
+          SIBAUDIT_ONLY: ${{ vars.SIBAUDIT_ONLY }}
+          SIBAUDIT_EXCEPT: ${{ vars.SIBAUDIT_EXCEPT }}
         run: python3 -m sibaudit --format github .
