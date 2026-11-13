@@ -676,6 +676,11 @@ def get_rule(code: str) -> Rule | None:
     return _BY_CODE.get(code.strip().upper())
 
 
+def known_codes() -> frozenset[str]:
+    """Every rule code in the catalog."""
+    return frozenset(_BY_CODE)
+
+
 def format_rule_list() -> str:
     """One line per rule: code, severity, title."""
     return "\n".join(f"{r.code}  {r.severity:<6}  {r.title}" for r in RULES)
