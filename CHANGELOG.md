@@ -4,6 +4,8 @@
 - Added `sibaudit.toml` and `[tool.sibaudit]` config so rules can be turned off or given a new severity.
 - Added `--min-severity`, `--only`, and `--except`; the sample GitHub Action forwards the same filters through `SIBAUDIT_*` variables.
 - Marked days 31 and 32 complete on the roadmap.
+- Added a file-level `// sibaudit:ignore-file` directive; on its own it skips the file, and with rule codes (`// sibaudit:ignore-file A017`) it drops only those rules. It must sit in the file header.
+- Marked day 33 complete on the roadmap.
 
 ## 2026-11-12
 - Added `--suggest` so each finding can carry a local fix hint from a built-in catalog that never talks to the network.
