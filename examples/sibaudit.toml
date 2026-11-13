@@ -1,0 +1,10 @@
+# Copy this file next to your contracts, or nest the [rules] table under
+# [tool.sibaudit] in pyproject.toml.
+#
+# false turns a rule off. A severity string (HIGH, MEDIUM, LOW) changes
+# the level of every finding from that rule. A table can set both.
+
+[rules]
+A017 = false
+A006 = "LOW"
+A001 = { enabled = true, severity = "HIGH" }

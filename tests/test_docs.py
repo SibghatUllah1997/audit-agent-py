@@ -49,6 +49,38 @@ def test_rule_examples_are_documented_and_marked_done() -> None:
     assert "- [x] Day 29: Add doc examples for each rule with rationale" in roadmap
 
 
+def test_config_and_filters_are_documented_and_days_31_32_are_done() -> None:
+    from sibaudit.config import load_config
+
+    text = README.read_text(encoding="utf-8")
+    assert "sibaudit.toml" in text
+    assert "[tool.sibaudit]" in text
+    assert "--min-severity" in text
+    assert "--only" in text
+    assert "--except" in text
+    assert "SIBAUDIT_MIN_SEVERITY" in text
+    assert "SIBAUDIT_ONLY" in text
+    assert "SIBAUDIT_EXCEPT" in text
+    assert "examples/sibaudit.toml" in text
+    sample = load_config(ROOT / "examples" / "sibaudit.toml")
+    assert sample.rules["A017"].enabled is False
+    assert sample.rules["A006"].severity == "LOW"
+    assert sample.rules["A001"].severity == "HIGH"
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert "## 2026-11-13" in changelog
+    assert "sibaudit.toml" in changelog
+    assert "--min-severity" in changelog
+    roadmap = ROADMAP.read_text(encoding="utf-8")
+    assert (
+        "- [x] Day 31: Add `sibaudit.toml` / `pyproject` config for enabling, "
+        "disabling, and setting severity of rules"
+    ) in roadmap
+    assert (
+        "- [x] Day 32: Add `--min-severity` and `--only` / `--except` CLI filters, "
+        "honored by the existing GitHub Action too"
+    ) in roadmap
+
+
 def test_suggest_is_documented_and_days_one_and_thirty_are_done() -> None:
     from sibaudit.suggest import hint_for
 

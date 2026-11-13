@@ -87,6 +87,7 @@ Notes
 - `--format summary` prints only the counts. `--format json` stays machine-readable (no summary footer).
 - `--format github` prints GitHub Actions workflow commands so findings become inline annotations.
 - `--suggest` adds a local fix hint under each finding (and a `suggestion` field in JSON).
+- `--min-severity`, `--only`, and `--except` filter the printed findings. `--config` picks a TOML file.
 - Exit code is 1 when findings exist, else 0.
 
 Rule explanations
@@ -132,6 +133,39 @@ Each line is a JSON object with:
 - `message` (string)
 - `suggestion` (string, only when `--suggest` is on)
 - `suggestion_source` (string: `catalog` | `command` | `local-llm`, only when `--suggest` is on)
+
+Rule config
+
+Put a `sibaudit.toml` next to your contracts, or a `[tool.sibaudit]` table in `pyproject.toml`:
+
+```toml
+[rules]
+A017 = false                          # turn a rule off
+A006 = "LOW"                          # rewrite severity
+A001 = { enabled = true, severity = "HIGH" }
+```
+
+In `pyproject.toml` nest that table under `[tool.sibaudit.rules]`. A sample file lives in `examples/sibaudit.toml`.
+
+- `false` disables a rule; `true` leaves it on.
+- A severity string (`HIGH`, `MEDIUM`, `LOW`) changes every finding from that rule.
+- A table can set `enabled` and `severity` together.
+- sibaudit walks up from the current directory and uses the nearest `sibaudit.toml`. If none is present, it uses `[tool.sibaudit]` in `pyproject.toml`. `--config FILE` picks one explicitly.
+- `--list-rules` still prints catalog defaults; config only affects scan findings.
+
+Filter findings
+
+```bash
+python3 -m sibaudit --min-severity HIGH path/to/contracts
+python3 -m sibaudit --only A008 --only A009 path/to/contracts
+python3 -m sibaudit --except A017,A010 path/to/contracts
+```
+
+- `--min-severity` keeps findings at that level and above (`LOW` < `MEDIUM` < `HIGH`).
+- `--only` is an allowlist and `--except` is a blocklist. Both are repeatable and accept comma-separated codes. `--except` is applied after `--only`.
+- Filters run after config, so a severity override can pass a higher `--min-severity` floor.
+- Unknown codes or severities exit with code 2.
+- If the flags are omitted, `SIBAUDIT_MIN_SEVERITY`, `SIBAUDIT_ONLY`, and `SIBAUDIT_EXCEPT` are read instead. An explicit flag always wins.
 
 Include and exclude files
 
@@ -242,6 +276,7 @@ Use it as a GitHub Action
 - It installs `sibaudit`, scans `.` with `--format github`, and fails the job when findings exist.
 - Annotations still show on the pull request when the step fails.
 - Change the scan path if contracts do not live at the repo root.
+- Set repository variables `SIBAUDIT_MIN_SEVERITY`, `SIBAUDIT_ONLY`, and `SIBAUDIT_EXCEPT` to apply the same filters as the CLI flags. Leave them unset for a full scan.
 
 Ignoring one line
 
@@ -282,7 +317,9 @@ flowchart TD
     D --> E12[locked ether]
     D --> E13[broken onlyOwner]
     E1 & E2 & E3 & E4 & E5 & E6 & E7 & E8 & E9 & E10 & E11 & E12 & E13 --> F[Findings list]
-    F -->|optional baseline file| G[Suppress known issues]
+    F -->|sibaudit.toml / --config| CFG[Enable, disable, severity]
+    CFG -->|--min-severity --only --except| FLT[Filter findings]
+    FLT -->|optional baseline file| G[Suppress known issues]
     G -->|optional --suggest catalog/cmd| I[Local fix hints]
     I -->|--format text/json/summary/github| H[stdout + exit code]
 ```
