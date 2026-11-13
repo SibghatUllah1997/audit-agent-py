@@ -5,6 +5,7 @@ from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from .directives import parse_ignore_file
 from .globs import is_selected
 
 # Basic risky patterns
@@ -1477,6 +1478,30 @@ def _detect_incorrect_only_owner(
         )
 
 
+_DETECTORS = (
+    _detect_tx_origin,
+    _detect_tx_origin_auth_comparison,
+    _detect_unchecked_low_level_call,
+    _detect_delegatecall_usage,
+    _detect_selfdestruct_or_suicide,
+    _detect_state_var_shadowing,
+    _detect_block_timestamp_usage,
+    _detect_pre_08_unchecked_arithmetic,
+    _detect_reentrancy_prone_calls,
+    _detect_missing_access_control,
+    _detect_tx_gasprice_usage,
+    _detect_assert_misuse,
+    _detect_events_missing_critical_params,
+    _detect_blockhash_misuse,
+    _detect_uninitialized_address,
+    _detect_missing_zero_address_check,
+    _detect_magic_numbers,
+    _detect_constructor_external_calls,
+    _detect_payable_without_withdraw,
+    _detect_incorrect_only_owner,
+)
+
+
 def scan_paths(
     paths: Iterable[str],
     include: Sequence[str] | None = None,
@@ -1491,31 +1516,21 @@ def scan_paths(
             # Skip unreadable files
             continue
         lines = content.splitlines()
+        file_ignore = parse_ignore_file(lines)
+        if file_ignore is not None and not file_ignore.codes:
+            # Whole file opted out; skip running any detector.
+            continue
+        file_findings: list[Finding] = []
         # Build ignore set: for any line containing the directive, ignore the next line index.
         ignore_next_lines: set[int] = set()
         for idx, line in enumerate(lines, start=1):
             if "sibaudit:ignore-next-line" in line:
                 ignore_next_lines.add(idx + 1)
 
-        findings.extend(_detect_tx_origin(lines, file_path, ignore_next_lines))
-        findings.extend(_detect_tx_origin_auth_comparison(lines, file_path, ignore_next_lines))
-        findings.extend(_detect_unchecked_low_level_call(lines, file_path, ignore_next_lines))
-        findings.extend(_detect_delegatecall_usage(lines, file_path, ignore_next_lines))
-        findings.extend(_detect_selfdestruct_or_suicide(lines, file_path, ignore_next_lines))
-        findings.extend(_detect_state_var_shadowing(lines, file_path, ignore_next_lines))
-        findings.extend(_detect_block_timestamp_usage(lines, file_path, ignore_next_lines))
-        findings.extend(_detect_pre_08_unchecked_arithmetic(lines, file_path, ignore_next_lines))
-        findings.extend(_detect_reentrancy_prone_calls(lines, file_path, ignore_next_lines))
-        findings.extend(_detect_missing_access_control(lines, file_path, ignore_next_lines))
-        findings.extend(_detect_tx_gasprice_usage(lines, file_path, ignore_next_lines))
-        findings.extend(_detect_assert_misuse(lines, file_path, ignore_next_lines))
-        findings.extend(_detect_events_missing_critical_params(lines, file_path, ignore_next_lines))
-        findings.extend(_detect_blockhash_misuse(lines, file_path, ignore_next_lines))
-        findings.extend(_detect_uninitialized_address(lines, file_path, ignore_next_lines))
-        findings.extend(_detect_missing_zero_address_check(lines, file_path, ignore_next_lines))
-        findings.extend(_detect_magic_numbers(lines, file_path, ignore_next_lines))
-        findings.extend(_detect_constructor_external_calls(lines, file_path, ignore_next_lines))
-        findings.extend(_detect_payable_without_withdraw(lines, file_path, ignore_next_lines))
-        findings.extend(_detect_incorrect_only_owner(lines, file_path, ignore_next_lines))
+        for detector in _DETECTORS:
+            file_findings.extend(detector(lines, file_path, ignore_next_lines))
+        if file_ignore is not None:
+            file_findings = [f for f in file_findings if not file_ignore.covers(f.code)]
+        findings.extend(file_findings)
     return findings
 
