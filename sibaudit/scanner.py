@@ -233,6 +233,36 @@ REQUIRE_VAR_PATTERN_FMT = r"require\s*\(\s*{var}\s*(?:[,)])"
 ASSERT_VAR_PATTERN_FMT = r"assert\s*\(\s*{var}\s*\)"
 IF_NOT_VAR_PATTERN_FMT = r"if\s*\(\s*!\s*{var}\s*\)"
 
+ECRECOVER_PATTERN = re.compile(r"\becrecover\s*\(", re.IGNORECASE)
+ASSIGN_NAME_BEFORE_CALL_PATTERN = re.compile(
+    r"(?:address(?:\s+payable)?\s+)?(?P<name>[A-Za-z_]\w*)\s*=\s*$",
+    re.IGNORECASE,
+)
+NAME_COMPARE_FMT = (
+    r"(?<![A-Za-z0-9_]){name}(?![A-Za-z0-9_])\s*(?:==|!=)"
+    r"|(?:==|!=)\s*(?<![A-Za-z0-9_]){name}(?![A-Za-z0-9_])"
+)
+ASSIGN_SKIP_NAMES = frozenset(
+    {
+        "return",
+        "require",
+        "assert",
+        "if",
+        "else",
+        "while",
+        "for",
+        "delete",
+        "emit",
+        "revert",
+        "catch",
+        "try",
+        "bool",
+        "true",
+        "false",
+    }
+)
+WS_CHARS = frozenset(" \t\r\n")
+
 
 @dataclass(frozen=True)
 class Finding:
@@ -1436,6 +1466,83 @@ def _has_auth_check(text: str) -> bool:
     return bool(OWNER_HELPER_PATTERN.search(text))
 
 
+def _close_paren_end(text: str, open_index: int) -> int | None:
+    """Return the index just after the matching ``)``, or None if unbalanced."""
+    args = _extract_paren_args(text, open_index)
+    if args is None:
+        return None
+    return open_index + len(args) + 2
+
+
+def _expr_is_compared(text: str, start: int, end: int) -> bool:
+    """True if ``text[start:end]`` is the left or right side of ``==`` / ``!=``."""
+    i = end
+    n = len(text)
+    while i < n and text[i] in WS_CHARS:
+        i += 1
+    if text.startswith("==", i) or text.startswith("!=", i):
+        return True
+    i = start
+    while i > 0 and text[i - 1] in WS_CHARS:
+        i -= 1
+    return i >= 2 and text[i - 2 : i] in ("==", "!=")
+
+
+def _name_is_compared(text: str, name: str) -> bool:
+    """True if ``name`` appears in an equality or inequality in ``text``."""
+    pattern = re.compile(NAME_COMPARE_FMT.format(name=re.escape(name)))
+    return bool(pattern.search(text))
+
+
+def _assigned_name_before(text: str, call_start: int) -> str | None:
+    """Variable assigned from the expression that starts at ``call_start``, if any."""
+    match = ASSIGN_NAME_BEFORE_CALL_PATTERN.search(text[:call_start])
+    if not match:
+        return None
+    name = match.group("name")
+    if name.lower() in ASSIGN_SKIP_NAMES:
+        return None
+    return name
+
+
+def _iter_ecrecover_calls(source: str) -> Iterator[tuple[int, int, str | None]]:
+    """Yield ``(start, end, assigned_name)`` for each ``ecrecover(...)`` in ``source``."""
+    for match in ECRECOVER_PATTERN.finditer(source):
+        close_end = _close_paren_end(source, match.end() - 1)
+        if close_end is None:
+            continue
+        yield match.start(), close_end, _assigned_name_before(source, match.start())
+
+
+def _detect_ecrecover_without_signer_check(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    # ecrecover returns address(0) on failure. Using that value as a signer
+    # without rejecting zero or matching a known identity treats a bad
+    # signature as a valid one.
+    for func in _iter_functions(lines, include_constructors=True):
+        source = _function_source(lines, func)
+        for start, end, name in _iter_ecrecover_calls(source):
+            line_no = func.start_line + source[:start].count("\n")
+            if ignore_next_lines and line_no in ignore_next_lines:
+                continue
+            if _expr_is_compared(source, start, end):
+                continue
+            if name and _name_is_compared(source[end:], name):
+                continue
+            yield Finding(
+                file_path=file_path,
+                line_number=line_no,
+                code="A021",
+                severity="HIGH",
+                message=(
+                    "ecrecover result is used without a zero-address or "
+                    "identity check on the signer."
+                ),
+                line_text=lines[line_no - 1].rstrip(),
+            )
+
+
 def _detect_incorrect_only_owner(
     lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
 ) -> Iterator[Finding]:
@@ -1499,6 +1606,7 @@ _DETECTORS = (
     _detect_constructor_external_calls,
     _detect_payable_without_withdraw,
     _detect_incorrect_only_owner,
+    _detect_ecrecover_without_signer_check,
 )
 
 

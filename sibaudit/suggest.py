@@ -199,6 +199,11 @@ _HINTS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
             ),
         ),
     ),
+    (
+        "A021",
+        "Require the recovered address is not address(0) and matches the expected signer.",
+        (),
+    ),
 )
 
 

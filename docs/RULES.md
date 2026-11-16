@@ -732,3 +732,51 @@ contract Box {
     }
 }
 ```
+
+## A021: `ecrecover` without a zero-address or identity check
+
+Severity: **HIGH**
+
+`ecrecover` returns `address(0)` when the signature is malformed. Using that value as a signer, or skipping a match against a known address, lets a bad signature pass as a valid one.
+
+Flagged:
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract Permit {
+    mapping(address => uint256) public nonces;
+
+    function claim(bytes32 digest, uint8 v, bytes32 r, bytes32 s) external {
+        address signer = ecrecover(digest, v, r, s);
+        nonces[signer] += 1;
+    }
+}
+```
+
+Fixed:
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract Permit {
+    address public immutable issuer;
+
+    constructor(address who) {
+        require(who != address(0), "zero");
+        issuer = who;
+    }
+
+    function claim(bytes32 digest, uint8 v, bytes32 r, bytes32 s)
+        external
+        view
+        returns (bool)
+    {
+        address signer = ecrecover(digest, v, r, s);
+        require(signer != address(0), "bad sig");
+        return signer == issuer;
+    }
+}
+```
