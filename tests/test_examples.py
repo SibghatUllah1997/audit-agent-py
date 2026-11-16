@@ -54,3 +54,11 @@ def test_sample_contract_flags_broken_only_owner() -> None:
     assert broken
     assert any("onlyOwner" in f.line_text for f in broken)
     assert any("never checks the caller" in f.message for f in broken)
+
+
+def test_sample_contract_flags_unchecked_ecrecover() -> None:
+    findings = scan_paths([str(EXAMPLES)])
+    recovered = [f for f in findings if f.code == "A021"]
+    assert recovered
+    assert any("ecrecover" in f.line_text for f in recovered)
+    assert any("zero-address" in f.message or "identity" in f.message for f in recovered)

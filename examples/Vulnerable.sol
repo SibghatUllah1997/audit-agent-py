@@ -125,3 +125,14 @@ contract FakeOwnable {
         n = 1;
     }
 }
+
+// ecrecover result is trusted without rejecting address(0) or matching a signer.
+contract OpenPermit {
+    mapping(address => uint256) public nonces;
+
+    function claim(bytes32 digest, uint8 v, bytes32 r, bytes32 s) external {
+        // A021
+        address signer = ecrecover(digest, v, r, s);
+        nonces[signer] += 1;
+    }
+}

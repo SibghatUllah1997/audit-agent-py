@@ -81,6 +81,7 @@ Example output (real):
 /workspace/examples/Vulnerable.sol:107: A019 Payable receive() can receive ether, but the contract has no withdraw path.
 /workspace/examples/Vulnerable.sol:109: A019 Payable function "donate" can receive ether, but the contract has no withdraw path.
 /workspace/examples/Vulnerable.sol:119: A020 Modifier "onlyOwner" never checks the caller.
+/workspace/examples/Vulnerable.sol:135: A021 ecrecover result is used without a zero-address or identity check on the signer.
 ```
 
 Notes
