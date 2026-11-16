@@ -83,6 +83,7 @@ Example output (real):
 /workspace/examples/Vulnerable.sol:109: A019 Payable function "donate" can receive ether, but the contract has no withdraw path.
 /workspace/examples/Vulnerable.sol:119: A020 Modifier "onlyOwner" never checks the caller.
 /workspace/examples/Vulnerable.sol:135: A021 ecrecover result is used without a zero-address or identity check on the signer.
+/workspace/examples/Vulnerable.sol:144: A022 address.transfer() forwards only 2300 gas; prefer call{value: ...} and check success.
 ```
 
 Notes

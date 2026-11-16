@@ -136,3 +136,11 @@ contract OpenPermit {
         nonces[signer] += 1;
     }
 }
+
+// 2300-gas stipend sends fail when the recipient does more than log an event.
+contract StipendPay {
+    function payout(address payable to) external {
+        // A022
+        to.transfer(address(this).balance);
+    }
+}

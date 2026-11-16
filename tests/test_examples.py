@@ -62,3 +62,11 @@ def test_sample_contract_flags_unchecked_ecrecover() -> None:
     assert recovered
     assert any("ecrecover" in f.line_text for f in recovered)
     assert any("zero-address" in f.message or "identity" in f.message for f in recovered)
+
+
+def test_sample_contract_flags_stipend_ether_send() -> None:
+    findings = scan_paths([str(EXAMPLES)])
+    stipend = [f for f in findings if f.code == "A022"]
+    assert stipend
+    assert any(".transfer(" in f.line_text for f in stipend)
+    assert any("2300" in f.message for f in stipend)
