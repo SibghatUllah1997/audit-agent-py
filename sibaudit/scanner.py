@@ -1278,6 +1278,21 @@ def _extract_paren_args(text: str, open_index: int) -> str | None:
     return None
 
 
+def _args_from_open_paren(lines: list[str], line_idx: int, open_col: int) -> str | None:
+    """Argument text of a call whose ``(`` sits at ``lines[line_idx][open_col]``.
+
+    Reads following lines when the parenthesis group is not closed on the first.
+    """
+    text = _without_line_comment(lines[line_idx])
+    args = _extract_paren_args(text, open_col)
+    i = line_idx
+    while args is None and i + 1 < len(lines):
+        i += 1
+        text += "\n" + _without_line_comment(lines[i])
+        args = _extract_paren_args(text, open_col)
+    return args
+
+
 def _has_top_level_comma(args: str) -> bool:
     depth = 0
     for char in args:
@@ -1543,6 +1558,51 @@ def _detect_ecrecover_without_signer_check(
             )
 
 
+def _detect_stipend_ether_send(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    # address.transfer/send forward only 2300 gas. That stipend is often too
+    # small for the recipient, so the send reverts or returns false. Prefer a
+    # low-level call with value and a success check. A two-argument
+    # .transfer(to, amount) is treated as ERC-20, not ether.
+    for idx, line in enumerate(lines, start=1):
+        if ignore_next_lines and idx in ignore_next_lines:
+            continue
+        code = _without_line_comment(line)
+        if not code.strip():
+            continue
+        for match in ETHER_SEND_PATTERN.finditer(code):
+            args = _args_from_open_paren(lines, idx - 1, match.end() - 1)
+            if args is None or _has_top_level_comma(args):
+                continue
+            yield Finding(
+                file_path=file_path,
+                line_number=idx,
+                code="A022",
+                severity="MEDIUM",
+                message=(
+                    "address.send() forwards only 2300 gas; prefer call{value: ...} "
+                    "and check success."
+                ),
+                line_text=line.rstrip(),
+            )
+        for match in ETHER_TRANSFER_OPEN_PATTERN.finditer(code):
+            args = _args_from_open_paren(lines, idx - 1, match.end() - 1)
+            if args is None or _has_top_level_comma(args):
+                continue
+            yield Finding(
+                file_path=file_path,
+                line_number=idx,
+                code="A022",
+                severity="MEDIUM",
+                message=(
+                    "address.transfer() forwards only 2300 gas; prefer call{value: ...} "
+                    "and check success."
+                ),
+                line_text=line.rstrip(),
+            )
+
+
 def _detect_incorrect_only_owner(
     lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
 ) -> Iterator[Finding]:
@@ -1607,6 +1667,7 @@ _DETECTORS = (
     _detect_payable_without_withdraw,
     _detect_incorrect_only_owner,
     _detect_ecrecover_without_signer_check,
+    _detect_stipend_ether_send,
 )
 
 

@@ -204,6 +204,20 @@ _HINTS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
         "Require the recovered address is not address(0) and matches the expected signer.",
         (),
     ),
+    (
+        "A022",
+        "Replace address.transfer/send with call{value: amount} and require the success flag.",
+        (
+            (
+                "address.send()",
+                "Replace address.send with call{value: amount} and require the success flag.",
+            ),
+            (
+                "address.transfer()",
+                "Replace address.transfer with call{value: amount} and require the success flag.",
+            ),
+        ),
+    ),
 )
 
 

@@ -691,7 +691,8 @@ contract Jar {
 
     function withdraw() external {
         require(msg.sender == owner, "owner");
-        payable(owner).transfer(address(this).balance);
+        (bool ok, ) = payable(owner).call{value: address(this).balance}("");
+        require(ok, "send failed");
     }
 }
 ```
@@ -777,6 +778,39 @@ contract Permit {
         address signer = ecrecover(digest, v, r, s);
         require(signer != address(0), "bad sig");
         return signer == issuer;
+    }
+}
+```
+
+## A022: Ether `transfer`/`send` (2300-gas stipend) used instead of `call`
+
+Severity: **MEDIUM**
+
+`address.transfer` and `address.send` forward only 2300 gas. A recipient that does more than log an event will fail, and the stipend is too small after gas-cost changes. Send value with `call` and check the success flag.
+
+Flagged:
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract Wallet {
+    function pay(address payable to, uint256 amount) external {
+        to.transfer(amount);
+    }
+}
+```
+
+Fixed:
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract Wallet {
+    function pay(address payable to, uint256 amount) external {
+        (bool ok, ) = to.call{value: amount}("");
+        require(ok, "pay failed");
     }
 }
 ```

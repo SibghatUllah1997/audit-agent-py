@@ -627,7 +627,8 @@ RULES: tuple[Rule, ...] = (
 
                 function withdraw() external {
                     require(msg.sender == owner, "owner");
-                    payable(owner).transfer(address(this).balance);
+                    (bool ok, ) = payable(owner).call{value: address(this).balance}("");
+                    require(ok, "send failed");
                 }
             }
             """
@@ -705,6 +706,35 @@ RULES: tuple[Rule, ...] = (
                     address signer = ecrecover(digest, v, r, s);
                     require(signer != address(0), "bad sig");
                     return signer == issuer;
+                }
+            }
+            """
+        ),
+    ),
+    Rule(
+        code="A022",
+        severity="MEDIUM",
+        title="Ether `transfer`/`send` (2300-gas stipend) used instead of `call`",
+        rationale=(
+            "`address.transfer` and `address.send` forward only 2300 gas. A recipient that "
+            "does more than log an event will fail, and the stipend is too small after "
+            "gas-cost changes. Send value with `call` and check the success flag."
+        ),
+        flagged=_sol(
+            """
+            contract Wallet {
+                function pay(address payable to, uint256 amount) external {
+                    to.transfer(amount);
+                }
+            }
+            """
+        ),
+        fixed=_sol(
+            """
+            contract Wallet {
+                function pay(address payable to, uint256 amount) external {
+                    (bool ok, ) = to.call{value: amount}("");
+                    require(ok, "pay failed");
                 }
             }
             """

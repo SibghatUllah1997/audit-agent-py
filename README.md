@@ -34,6 +34,7 @@ Rules
 | A019 | MEDIUM   | Payable function that can receive ether with no withdraw path |
 | A020 | HIGH     | `onlyOwner`-style modifier that does not actually check the caller |
 | A021 | HIGH     | `ecrecover` without a zero-address or identity check on the signer |
+| A022 | MEDIUM   | Ether `transfer`/`send` (2300-gas stipend) used instead of `call` |
 
 Install
 - Python 3.11+
