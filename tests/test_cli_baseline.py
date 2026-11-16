@@ -10,7 +10,7 @@ from sibaudit.cli import main
 from sibaudit.scanner import scan_paths
 
 RISKY = """
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 contract C {
     function f() external view returns (address) {
         return tx.origin;

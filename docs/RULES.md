@@ -14,7 +14,7 @@ Flagged:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Logger {
     event Seen(address who);
@@ -29,7 +29,7 @@ Fixed:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Logger {
     event Seen(address who);
@@ -50,7 +50,7 @@ Flagged:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Pinger {
     function ping(address target) external {
@@ -63,7 +63,7 @@ Fixed:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Pinger {
     function ping(address target) external {
@@ -83,7 +83,7 @@ Flagged:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Runner {
     function run(address target, bytes calldata data) external {
@@ -97,7 +97,7 @@ Fixed:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 interface IWorker {
     function work(bytes calldata data) external;
@@ -122,7 +122,7 @@ Flagged:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Killable {
     address public immutable owner = msg.sender;
@@ -138,7 +138,7 @@ Fixed:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Pausable {
     address public immutable owner = msg.sender;
@@ -161,7 +161,7 @@ Flagged:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Config {
     uint256 public limit;
@@ -176,7 +176,7 @@ Fixed:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Config {
     uint256 public limit;
@@ -197,7 +197,7 @@ Flagged:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Lottery {
     function pick(uint256 n) external view returns (uint256) {
@@ -210,7 +210,7 @@ Fixed:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Lottery {
     function pick(uint256 seed, uint256 n) external pure returns (uint256) {
@@ -229,7 +229,7 @@ Flagged:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.7.6;
+pragma solidity 0.7.6;
 
 contract Adder {
     function add(uint256 a, uint256 b) external pure returns (uint256) {
@@ -243,7 +243,7 @@ Fixed:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Adder {
     function add(uint256 a, uint256 b) external pure returns (uint256) {
@@ -263,7 +263,7 @@ Flagged:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Bank {
     mapping(address => uint256) public balances;
@@ -281,7 +281,7 @@ Fixed:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Bank {
     mapping(address => uint256) public balances;
@@ -305,7 +305,7 @@ Flagged:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Token {
     mapping(address => uint256) public balances;
@@ -320,7 +320,7 @@ Fixed:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Token {
     address public immutable owner = msg.sender;
@@ -343,7 +343,7 @@ Flagged:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Fees {
     function discounted() external view returns (bool) {
@@ -356,7 +356,7 @@ Fixed:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Fees {
     mapping(address => bool) public members;
@@ -377,7 +377,7 @@ Flagged:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Vault {
     function canPay(uint256 amount) external view returns (bool) {
@@ -391,7 +391,7 @@ Fixed:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Vault {
     function canPay(uint256 amount) external view returns (bool) {
@@ -411,7 +411,7 @@ Flagged:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Token {
     event Transfer(address from, address to);
@@ -422,7 +422,7 @@ Fixed:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Token {
     event Transfer(address indexed from, address indexed to, uint256 value);
@@ -439,7 +439,7 @@ Flagged:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Raffle {
     function draw() external view returns (uint256) {
@@ -452,7 +452,7 @@ Fixed:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Raffle {
     uint256 public lastRandom;
@@ -473,7 +473,7 @@ Flagged:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Wallet {
     address public immutable owner = msg.sender;
@@ -490,7 +490,7 @@ Fixed:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Wallet {
     address public immutable owner = msg.sender;
@@ -513,7 +513,7 @@ Flagged:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Fees {
     address public collector;
@@ -528,7 +528,7 @@ Fixed:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Fees {
     address public immutable collector;
@@ -550,7 +550,7 @@ Flagged:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Treasury {
     address public treasury;
@@ -565,7 +565,7 @@ Fixed:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Treasury {
     address public treasury;
@@ -587,7 +587,7 @@ Flagged:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Fees {
     function feeOn(uint256 amount) external pure returns (uint256) {
@@ -600,7 +600,7 @@ Fixed:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Fees {
     uint256 public constant FEE_BPS = 25;
@@ -622,7 +622,7 @@ Flagged:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 interface IRegistry {
     function register() external;
@@ -639,7 +639,7 @@ Fixed:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 interface IRegistry {
     function register() external;
@@ -664,7 +664,7 @@ Flagged:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Jar {
     mapping(address => uint256) public gifts;
@@ -679,7 +679,7 @@ Fixed:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Jar {
     address public immutable owner = msg.sender;
@@ -707,7 +707,7 @@ Flagged:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Box {
     address public immutable owner = msg.sender;
@@ -722,7 +722,7 @@ Fixed:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Box {
     address public immutable owner = msg.sender;
@@ -744,7 +744,7 @@ Flagged:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Permit {
     mapping(address => uint256) public nonces;
@@ -760,7 +760,7 @@ Fixed:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Permit {
     address public immutable issuer;
@@ -792,7 +792,7 @@ Flagged:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Wallet {
     function pay(address payable to, uint256 amount) external {
@@ -805,12 +805,40 @@ Fixed:
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Wallet {
     function pay(address payable to, uint256 amount) external {
         (bool ok, ) = to.call{value: amount}("");
         require(ok, "pay failed");
     }
+}
+```
+
+## A023: Floating Solidity pragma (`^`, `~`, `>=`) in a deployable source
+
+Severity: **LOW**
+
+A floating pragma lets every build pick a different compiler, so the bytecode you tested and audited may not be the bytecode you deploy. Pin one exact version in contracts and libraries. Tests, scripts, mocks and interface-only files are skipped.
+
+Flagged:
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract Vault {
+    uint256 public total;
+}
+```
+
+Fixed:
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
+
+contract Vault {
+    uint256 public total;
 }
 ```

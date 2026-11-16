@@ -13,7 +13,7 @@ from sibaudit.cli import main
 from sibaudit.suggest import hint_for
 
 RISKY = """
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 contract C {
     function f() external view returns (address) {
         return tx.origin;
@@ -102,7 +102,7 @@ def test_suggest_on_clean_file_prints_nothing(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     sol = tmp_path / "Clean.sol"
-    sol.write_text("pragma solidity ^0.8.20;\ncontract C {}\n")
+    sol.write_text("pragma solidity 0.8.20;\ncontract C {}\n")
     with pytest.raises(SystemExit) as clean:
         main([str(sol), "--suggest"])
     assert clean.value.code == 0

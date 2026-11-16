@@ -8,7 +8,7 @@ import pytest
 from sibaudit.cli import main
 
 RISKY = """
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 contract C {
     function f() external view returns (address) {
         return tx.origin;
@@ -48,7 +48,7 @@ def test_summary_format_omits_file_lines(
 
 def test_summary_format_zero_findings(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     sol = tmp_path / "Clean.sol"
-    sol.write_text("pragma solidity ^0.8.20;\ncontract C {}\n")
+    sol.write_text("pragma solidity 0.8.20;\ncontract C {}\n")
     with pytest.raises(SystemExit) as clean:
         main([str(sol), "--format", "summary"])
     assert clean.value.code == 0

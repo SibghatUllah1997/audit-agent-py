@@ -218,6 +218,11 @@ _HINTS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
             ),
         ),
     ),
+    (
+        "A023",
+        "Pin the pragma to the exact compiler you test and deploy with (pragma solidity 0.8.20;).",
+        (),
+    ),
 )
 
 

@@ -50,7 +50,7 @@ def test_sample_config_is_valid_and_uses_this_hook() -> None:
 
 def test_cli_accepts_many_filenames_like_pre_commit_passes_them(tmp_path: Path) -> None:
     clean = tmp_path / "Clean.sol"
-    clean.write_text("pragma solidity ^0.8.20;\ncontract Clean { uint256 x; }\n")
+    clean.write_text("pragma solidity 0.8.20;\ncontract Clean { uint256 x; }\n")
     base = [sys.executable, "-m", "sibaudit"]
 
     dirty = subprocess.run(
