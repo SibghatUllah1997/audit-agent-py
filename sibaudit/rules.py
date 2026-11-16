@@ -10,8 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from textwrap import dedent
 
-HEADER = "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.20;\n\n"
-LEGACY_HEADER = "// SPDX-License-Identifier: MIT\npragma solidity ^0.7.6;\n\n"
+HEADER = "// SPDX-License-Identifier: MIT\npragma solidity 0.8.20;\n\n"
+LEGACY_HEADER = "// SPDX-License-Identifier: MIT\npragma solidity 0.7.6;\n\n"
 
 
 @dataclass(frozen=True)
@@ -736,6 +736,35 @@ RULES: tuple[Rule, ...] = (
                     (bool ok, ) = to.call{value: amount}("");
                     require(ok, "pay failed");
                 }
+            }
+            """
+        ),
+    ),
+    Rule(
+        code="A023",
+        severity="LOW",
+        title="Floating Solidity pragma (`^`, `~`, `>=`) in a deployable source",
+        rationale=(
+            "A floating pragma lets every build pick a different compiler, so the bytecode "
+            "you tested and audited may not be the bytecode you deploy. Pin one exact "
+            "version in contracts and libraries. Tests, scripts, mocks and interface-only "
+            "files are skipped."
+        ),
+        flagged=(
+            "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.20;\n\n"
+            + dedent(
+                """
+                contract Vault {
+                    uint256 public total;
+                }
+                """
+            ).strip()
+            + "\n"
+        ),
+        fixed=_sol(
+            """
+            contract Vault {
+                uint256 public total;
             }
             """
         ),

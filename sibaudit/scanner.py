@@ -1645,6 +1645,80 @@ def _detect_incorrect_only_owner(
         )
 
 
+SOLIDITY_PRAGMA_PATTERN = re.compile(r"^\s*pragma\s+solidity\s+(?P<spec>[^;]+);")
+EXACT_VERSION_PATTERN = re.compile(r"^=?\s*\d+\.\d+\.\d+$")
+VERSION_NUMBER_PATTERN = re.compile(r"\d+\.\d+\.\d+")
+CONTRACT_OR_LIBRARY_PATTERN = re.compile(r"^\s*(?:abstract\s+)?(?:contract|library)\s+[A-Za-z_]")
+NON_PRODUCTION_SUFFIXES = (".t.sol", ".s.sol")
+
+
+def _is_non_production_file(file_path: Path) -> bool:
+    """Foundry tests (``.t.sol``), scripts (``.s.sol``) and mocks never ship."""
+    name = file_path.name
+    if name.endswith(NON_PRODUCTION_SUFFIXES):
+        return True
+    stem = name[: -len(".sol")] if name.endswith(".sol") else name
+    return stem.startswith("Mock") or stem.endswith("Mock")
+
+
+def _floating_reason(spec: str) -> str | None:
+    """Return why a ``pragma solidity`` version spec floats, or None if it is pinned."""
+    compact = " ".join(spec.split())
+    if EXACT_VERSION_PATTERN.match(compact):
+        return None
+    if "||" in compact:
+        return "allows several version ranges"
+    if " - " in compact:
+        return "is a hyphen range"
+    if "^" in compact:
+        return "uses ^ and accepts newer compiler releases"
+    if "~" in compact:
+        return "uses ~ and accepts any later patch compiler"
+    if ">" in compact:
+        return "has an open lower bound"
+    if "<" in compact:
+        return "only sets an upper bound"
+    if "*" in compact or re.search(r"\.[xX]\b", compact):
+        return "uses a wildcard version"
+    return "does not name one exact compiler version"
+
+
+def _detect_floating_pragma(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    # A floating pragma lets each build pick a different compiler, so the
+    # bytecode that was tested and audited may not be the one deployed.
+    # Deployable sources should pin one version. Tests, scripts and mocks are
+    # skipped, and so are interface-only files, which are meant to be shared
+    # across compiler versions.
+    if _is_non_production_file(file_path):
+        return
+    if not any(CONTRACT_OR_LIBRARY_PATTERN.match(_without_line_comment(raw)) for raw in lines):
+        return
+    for idx, line in enumerate(lines, start=1):
+        if ignore_next_lines and idx in ignore_next_lines:
+            continue
+        match = SOLIDITY_PRAGMA_PATTERN.match(_without_line_comment(line))
+        if not match:
+            continue
+        spec = match.group("spec").strip()
+        reason = _floating_reason(spec)
+        if reason is None:
+            continue
+        message = f"Floating pragma \"{spec}\" {reason}; pin an exact compiler version"
+        version = VERSION_NUMBER_PATTERN.search(spec)
+        if version:
+            message += f" (for example {version.group(0)})"
+        yield Finding(
+            file_path=file_path,
+            line_number=idx,
+            code="A023",
+            severity="LOW",
+            message=message + ".",
+            line_text=line.rstrip(),
+        )
+
+
 _DETECTORS = (
     _detect_tx_origin,
     _detect_tx_origin_auth_comparison,
@@ -1668,6 +1742,7 @@ _DETECTORS = (
     _detect_incorrect_only_owner,
     _detect_ecrecover_without_signer_check,
     _detect_stipend_ether_send,
+    _detect_floating_pragma,
 )
 
 

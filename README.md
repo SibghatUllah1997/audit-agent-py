@@ -35,6 +35,7 @@ Rules
 | A020 | HIGH     | `onlyOwner`-style modifier that does not actually check the caller |
 | A021 | HIGH     | `ecrecover` without a zero-address or identity check on the signer |
 | A022 | MEDIUM   | Ether `transfer`/`send` (2300-gas stipend) used instead of `call` |
+| A023 | LOW      | Floating Solidity pragma (`^`, `~`, `>=`) in a deployable source |
 
 Install
 - Python 3.11+
@@ -84,6 +85,7 @@ Example output (real):
 /workspace/examples/Vulnerable.sol:119: A020 Modifier "onlyOwner" never checks the caller.
 /workspace/examples/Vulnerable.sol:135: A021 ecrecover result is used without a zero-address or identity check on the signer.
 /workspace/examples/Vulnerable.sol:144: A022 address.transfer() forwards only 2300 gas; prefer call{value: ...} and check success.
+/workspace/examples/Vulnerable.sol:2: A023 Floating pragma "^0.7.6" uses ^ and accepts newer compiler releases; pin an exact compiler version (for example 0.7.6).
 ```
 
 Notes

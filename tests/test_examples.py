@@ -70,3 +70,11 @@ def test_sample_contract_flags_stipend_ether_send() -> None:
     assert stipend
     assert any(".transfer(" in f.line_text for f in stipend)
     assert any("2300" in f.message for f in stipend)
+
+
+def test_sample_contract_flags_floating_pragma() -> None:
+    findings = scan_paths([str(EXAMPLES)])
+    floating = [f for f in findings if f.code == "A023"]
+    assert len(floating) == 1
+    assert floating[0].line_number == 2
+    assert "^0.7.6" in floating[0].message
