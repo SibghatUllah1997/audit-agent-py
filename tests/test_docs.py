@@ -49,6 +49,25 @@ def test_rule_examples_are_documented_and_marked_done() -> None:
     assert "- [x] Day 29: Add doc examples for each rule with rationale" in roadmap
 
 
+def test_ecrecover_and_stipend_rules_are_documented_and_days_34_35_are_done() -> None:
+    text = README.read_text(encoding="utf-8")
+    assert "| A021 | HIGH" in text
+    assert "| A022 | MEDIUM" in text
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert "## 2026-11-16" in changelog
+    assert "A021" in changelog
+    assert "A022" in changelog
+    roadmap = ROADMAP.read_text(encoding="utf-8")
+    assert (
+        "- [x] Day 34: Add rule A021: `ecrecover` without a zero-address / "
+        "identity check on the recovered signer"
+    ) in roadmap
+    assert (
+        "- [x] Day 35: Add rule A022: ether `transfer`/`send` (2300-gas stipend) "
+        "used instead of `call`"
+    ) in roadmap
+
+
 def test_config_and_filters_are_documented_and_days_31_32_are_done() -> None:
     from sibaudit.config import load_config
 
