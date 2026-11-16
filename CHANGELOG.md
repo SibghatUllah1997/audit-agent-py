@@ -4,6 +4,8 @@
 - Added rule A021 to flag `ecrecover` when the recovered signer is never checked against `address(0)` or a known identity.
 - Added rule A022 to flag ether `transfer` and `send`, which forward only 2300 gas; prefer `call{value: ...}` and check success.
 - Marked days 34 and 35 complete on the roadmap.
+- Added rule A023 to flag a floating `pragma solidity` (`^`, `~`, `>=`, ranges, wildcards) in deployable sources; tests (`.t.sol`), scripts (`.s.sol`), mocks and interface-only files are skipped.
+- Catalog examples and clean test fixtures now pin `0.8.20`. Marked day 36 complete on the roadmap.
 
 ## 2026-11-13
 - Added `sibaudit.toml` and `[tool.sibaudit]` config so rules can be turned off or given a new severity.

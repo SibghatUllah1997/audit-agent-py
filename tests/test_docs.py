@@ -68,6 +68,16 @@ def test_ecrecover_and_stipend_rules_are_documented_and_days_34_35_are_done() ->
     ) in roadmap
 
 
+def test_floating_pragma_rule_is_documented_and_day_36_is_done() -> None:
+    assert "| A023 | LOW" in README.read_text(encoding="utf-8")
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert "A023" in changelog
+    roadmap = ROADMAP.read_text(encoding="utf-8")
+    assert (
+        "- [x] Day 36: Add rule A023: floating Solidity pragma (`^` / `>=`) in production sources"
+    ) in roadmap
+
+
 def test_config_and_filters_are_documented_and_days_31_32_are_done() -> None:
     from sibaudit.config import load_config
 
