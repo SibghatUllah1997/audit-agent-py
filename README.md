@@ -38,6 +38,7 @@ Rules
 | A023 | LOW      | Floating Solidity pragma (`^`, `~`, `>=`) in a deployable source |
 | A024 | HIGH     | `abi.encodePacked` of dynamic types can collide |
 | A025 | HIGH     | Upgradeable initializer left public, or `_disableInitializers` missing |
+| A026 | HIGH     | Signature replay: signed data has no nonce, deadline, or chain id |
 
 Install
 - Python 3.11+
@@ -91,6 +92,7 @@ Example output (real):
 /workspace/examples/Vulnerable.sol:152: A024 abi.encodePacked of multiple dynamic types can collide; use abi.encode.
 /workspace/examples/Vulnerable.sol:164: A025 Upgradeable initializer "initialize" is public without an initializer lock.
 /workspace/examples/Vulnerable.sol:161: A025 Upgradeable contract "OpenVault" has no constructor calling _disableInitializers().
+/workspace/examples/Vulnerable.sol:183: A026 Signature checked in "redeem" can be replayed; the signed data has no nonce, deadline, chain id.
 ```
 
 Notes

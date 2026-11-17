@@ -1940,6 +1940,98 @@ def _detect_upgradeable_initializer(
         )
 
 
+SIGNATURE_CHECK_PATTERN = re.compile(
+    r"\becrecover\s*\(|\.\s*(?:try)?[Rr]ecover\s*\(|\bisValidSignatureNow\s*\("
+)
+SIGNED_DIGEST_PATTERN = re.compile(
+    r"\bkeccak256\s*\(|\b_hashTypedDataV4\s*\(|\btoEthSignedMessageHash\s*\(|"
+    r"\btoTypedDataHash\s*\("
+)
+NONCE_EVIDENCE_PATTERN = re.compile(
+    r"nonce|\b(?:used|executed|consumed|claimed|spent|redeemed)\w*\s*\[",
+    re.IGNORECASE,
+)
+DEADLINE_EVIDENCE_PATTERN = re.compile(
+    r"deadline|expir|valid_?(?:until|before|after)|\bblock\.(?:timestamp|number)\b",
+    re.IGNORECASE,
+)
+CHAIN_EVIDENCE_PATTERN = re.compile(
+    r"chain_?id|domain_?separator|\b_hashTypedDataV4\b|\btoTypedDataHash\b",
+    re.IGNORECASE,
+)
+SIGNATURE_VERIFIER_NAMES = frozenset({"isValidSignature"})
+
+
+def _calls_function(source: str, name: str) -> bool:
+    return bool(re.search(rf"(?<![\w.]){re.escape(name)}\s*\(", source))
+
+
+def _missing_replay_guards(evidence: str) -> list[str]:
+    """Replay guards that leave no trace in ``evidence``."""
+    missing: list[str] = []
+    if not NONCE_EVIDENCE_PATTERN.search(evidence):
+        missing.append("nonce")
+    if not DEADLINE_EVIDENCE_PATTERN.search(evidence):
+        missing.append("deadline")
+    if not CHAIN_EVIDENCE_PATTERN.search(evidence):
+        missing.append("chain id")
+    return missing
+
+
+def _detect_signature_replay(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    # A signature over data with no nonce can be submitted again, one with no
+    # deadline stays valid forever, and one with no chain id can be replayed
+    # on a fork or another chain. Only digests the contract builds itself are
+    # judged; a digest passed in already hashed is opaque to a line scanner.
+    contracts = [c for c in _iter_contracts(lines) if c.kind == "contract"]
+    if not contracts:
+        return
+    functions = list(_iter_functions(lines, include_constructors=True))
+    sources = {id(func): _function_source(lines, func) for func in functions}
+    for contract in contracts:
+        owned = [
+            func
+            for func in functions
+            if contract.start_line <= func.start_line <= contract.end_line
+        ]
+        for func in owned:
+            if func.name in SIGNATURE_VERIFIER_NAMES:
+                continue
+            source = sources[id(func)]
+            match = SIGNATURE_CHECK_PATTERN.search(source)
+            if not match:
+                continue
+            line_no = func.start_line + source[: match.start()].count("\n")
+            if ignore_next_lines and line_no in ignore_next_lines:
+                continue
+            # Callers in the same contract often hash the message and bump
+            # the nonce before handing the digest to a shared helper.
+            callers = [
+                sources[id(other)]
+                for other in owned
+                if other is not func and _calls_function(sources[id(other)], func.name)
+            ]
+            evidence = "\n".join([source, *callers])
+            if not SIGNED_DIGEST_PATTERN.search(evidence):
+                continue
+            missing = _missing_replay_guards(evidence)
+            if not missing:
+                continue
+            yield Finding(
+                file_path=file_path,
+                line_number=line_no,
+                code="A026",
+                severity="HIGH",
+                message=(
+                    f'Signature checked in "{func.name}" can be replayed; the signed data has '
+                    f"no {', '.join(missing)}."
+                ),
+                line_text=lines[line_no - 1].rstrip(),
+            )
+
+
 def _detect_floating_pragma(
     lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
 ) -> Iterator[Finding]:
@@ -2001,6 +2093,7 @@ _DETECTORS = (
     _detect_stipend_ether_send,
     _detect_encode_packed_collision,
     _detect_upgradeable_initializer,
+    _detect_signature_replay,
     _detect_floating_pragma,
 )
 

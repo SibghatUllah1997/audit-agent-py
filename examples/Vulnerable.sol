@@ -166,3 +166,22 @@ contract OpenVault is Initializable {
         admin = admin_;
     }
 }
+
+// Signed voucher with no nonce, deadline or chain id can be redeemed again and again.
+contract ReplayVoucher {
+    address public immutable issuer;
+    mapping(address => uint256) public credit;
+
+    constructor(address who) {
+        require(who != address(0), "zero");
+        issuer = who;
+    }
+
+    function redeem(uint256 amount, uint8 v, bytes32 r, bytes32 s) external {
+        bytes32 digest = keccak256(abi.encode(msg.sender, amount));
+        // A026
+        address signer = ecrecover(digest, v, r, s);
+        require(signer != address(0) && signer == issuer, "bad sig");
+        credit[msg.sender] += amount;
+    }
+}

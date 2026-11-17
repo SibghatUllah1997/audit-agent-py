@@ -95,3 +95,11 @@ def test_sample_contract_flags_upgradeable_initializer() -> None:
     assert any("initialize" in f.line_text for f in inits)
     assert any("without an initializer lock" in f.message for f in inits)
     assert any("_disableInitializers" in f.message for f in inits)
+
+
+def test_sample_contract_flags_signature_replay() -> None:
+    findings = scan_paths([str(EXAMPLES)])
+    replay = [f for f in findings if f.code == "A026"]
+    assert len(replay) == 1
+    assert "ecrecover" in replay[0].line_text
+    assert "no nonce, deadline, chain id" in replay[0].message

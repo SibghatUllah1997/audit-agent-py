@@ -96,6 +96,16 @@ def test_encode_packed_and_initializer_rules_are_documented_and_days_37_38_are_d
     ) in roadmap
 
 
+
+def test_signature_replay_rule_is_documented_and_day_39_is_done() -> None:
+    assert "| A026 | HIGH" in README.read_text(encoding="utf-8")
+    assert "A026" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    roadmap = ROADMAP.read_text(encoding="utf-8")
+    assert (
+        "- [x] Day 39: Add rule A026: signature-replay risk "
+        "(signed data missing nonce, deadline, or chain id)"
+    ) in roadmap
+
 def test_config_and_filters_are_documented_and_days_31_32_are_done() -> None:
     from sibaudit.config import load_config
 
