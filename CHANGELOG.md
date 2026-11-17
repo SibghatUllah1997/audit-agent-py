@@ -4,6 +4,8 @@
 - Added rule A024 to flag `abi.encodePacked` of two or more dynamic values (`string`, `bytes`, arrays), which can hash-collide; prefer `abi.encode`.
 - Added rule A025 to flag a public upgradeable `initialize` without an initializer lock, and implementations that skip `_disableInitializers()` in the constructor.
 - Marked days 37 and 38 complete on the roadmap.
+- Added rule A026 to flag a signature check whose signed digest (built in the function or a same-contract caller) has no nonce, deadline, or chain id; EIP-712 typed data counts as chain-bound, and digests passed in already hashed are skipped.
+- Marked day 39 complete on the roadmap.
 
 ## 2026-11-16
 - Added rule A021 to flag `ecrecover` when the recovered signer is never checked against `address(0)` or a known identity.

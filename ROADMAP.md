@@ -43,7 +43,7 @@ More rules and scanner UX, still one small shippable step per day. Keep the anal
 - [x] Day 36: Add rule A023: floating Solidity pragma (`^` / `>=`) in production sources
 - [x] Day 37: Add rule A024: hash collisions from `abi.encodePacked` of dynamic types
 - [x] Day 38: Add rule A025: upgradeable initializer left public, or `_disableInitializers` missing in the constructor
-- [ ] Day 39: Add rule A026: signature-replay risk (signed data missing nonce, deadline, or chain id)
+- [x] Day 39: Add rule A026: signature-replay risk (signed data missing nonce, deadline, or chain id)
 - [ ] Day 40: Add rule A027: `extcodesize == 0` used as an EOA check (breaks under constructor and EIP-7702)
 - [ ] Day 41: Discover Foundry and Hardhat layouts (`src/`, `contracts/`) when a directory is scanned with no paths
 - [ ] Day 42: Add an HTML summary report and a `--fail-on` exit policy (for example, fail only on high)
