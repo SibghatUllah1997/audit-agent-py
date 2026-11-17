@@ -78,6 +78,24 @@ def test_floating_pragma_rule_is_documented_and_day_36_is_done() -> None:
     ) in roadmap
 
 
+def test_encode_packed_and_initializer_rules_are_documented_and_days_37_38_are_done() -> None:
+    text = README.read_text(encoding="utf-8")
+    assert "| A024 | HIGH" in text
+    assert "| A025 | HIGH" in text
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert "## 2026-11-17" in changelog
+    assert "A024" in changelog
+    assert "A025" in changelog
+    roadmap = ROADMAP.read_text(encoding="utf-8")
+    assert (
+        "- [x] Day 37: Add rule A024: hash collisions from `abi.encodePacked` of dynamic types"
+    ) in roadmap
+    assert (
+        "- [x] Day 38: Add rule A025: upgradeable initializer left public, or "
+        "`_disableInitializers` missing in the constructor"
+    ) in roadmap
+
+
 def test_config_and_filters_are_documented_and_days_31_32_are_done() -> None:
     from sibaudit.config import load_config
 

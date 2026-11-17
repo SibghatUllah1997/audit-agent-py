@@ -41,8 +41,8 @@ More rules and scanner UX, still one small shippable step per day. Keep the anal
 - [x] Day 34: Add rule A021: `ecrecover` without a zero-address / identity check on the recovered signer
 - [x] Day 35: Add rule A022: ether `transfer`/`send` (2300-gas stipend) used instead of `call`
 - [x] Day 36: Add rule A023: floating Solidity pragma (`^` / `>=`) in production sources
-- [ ] Day 37: Add rule A024: hash collisions from `abi.encodePacked` of dynamic types
-- [ ] Day 38: Add rule A025: upgradeable initializer left public, or `_disableInitializers` missing in the constructor
+- [x] Day 37: Add rule A024: hash collisions from `abi.encodePacked` of dynamic types
+- [x] Day 38: Add rule A025: upgradeable initializer left public, or `_disableInitializers` missing in the constructor
 - [ ] Day 39: Add rule A026: signature-replay risk (signed data missing nonce, deadline, or chain id)
 - [ ] Day 40: Add rule A027: `extcodesize == 0` used as an EOA check (breaks under constructor and EIP-7702)
 - [ ] Day 41: Discover Foundry and Hardhat layouts (`src/`, `contracts/`) when a directory is scanned with no paths

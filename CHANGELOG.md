@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-17
+- Added rule A024 to flag `abi.encodePacked` of two or more dynamic values (`string`, `bytes`, arrays), which can hash-collide; prefer `abi.encode`.
+- Added rule A025 to flag a public upgradeable `initialize` without an initializer lock, and implementations that skip `_disableInitializers()` in the constructor.
+- Marked days 37 and 38 complete on the roadmap.
+
 ## 2026-11-16
 - Added rule A021 to flag `ecrecover` when the recovered signer is never checked against `address(0)` or a known identity.
 - Added rule A022 to flag ether `transfer` and `send`, which forward only 2300 gas; prefer `call{value: ...}` and check success.
