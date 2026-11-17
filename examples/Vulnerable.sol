@@ -152,3 +152,17 @@ contract PackedLeaf {
         return keccak256(abi.encodePacked(a, b));
     }
 }
+
+// Proxy implementation leaves initialize public and never disables initializers.
+abstract contract Initializable {
+    function _disableInitializers() internal {}
+}
+
+contract OpenVault is Initializable {
+    address public admin;
+
+    function initialize(address admin_) public {
+        // A025
+        admin = admin_;
+    }
+}

@@ -89,6 +89,8 @@ Example output (real):
 /workspace/examples/Vulnerable.sol:144: A022 address.transfer() forwards only 2300 gas; prefer call{value: ...} and check success.
 /workspace/examples/Vulnerable.sol:2: A023 Floating pragma "^0.7.6" uses ^ and accepts newer compiler releases; pin an exact compiler version (for example 0.7.6).
 /workspace/examples/Vulnerable.sol:152: A024 abi.encodePacked of multiple dynamic types can collide; use abi.encode.
+/workspace/examples/Vulnerable.sol:164: A025 Upgradeable initializer "initialize" is public without an initializer lock.
+/workspace/examples/Vulnerable.sol:161: A025 Upgradeable contract "OpenVault" has no constructor calling _disableInitializers().
 ```
 
 Notes

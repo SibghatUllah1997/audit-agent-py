@@ -86,3 +86,12 @@ def test_sample_contract_flags_encode_packed_collision() -> None:
     assert packed
     assert any("encodePacked" in f.line_text for f in packed)
     assert any("dynamic" in f.message for f in packed)
+
+
+def test_sample_contract_flags_upgradeable_initializer() -> None:
+    findings = scan_paths([str(EXAMPLES)])
+    inits = [f for f in findings if f.code == "A025"]
+    assert inits
+    assert any("initialize" in f.line_text for f in inits)
+    assert any("without an initializer lock" in f.message for f in inits)
+    assert any("_disableInitializers" in f.message for f in inits)
