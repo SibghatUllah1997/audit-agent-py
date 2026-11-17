@@ -769,6 +769,44 @@ RULES: tuple[Rule, ...] = (
             """
         ),
     ),
+    Rule(
+        code="A024",
+        severity="HIGH",
+        title="`abi.encodePacked` of dynamic types can collide",
+        rationale=(
+            "`abi.encodePacked` concatenates values without a length prefix. Two dynamic "
+            "values such as `string` or `bytes` can be split in more than one way and still "
+            "hash to the same digest, so signatures, merkle leaves, and uniqueness checks "
+            "built on that hash can be forged. Use `abi.encode`, which length-prefixes "
+            "each value."
+        ),
+        flagged=_sol(
+            """
+            contract Merkle {
+                function leaf(string memory a, string memory b)
+                    external
+                    pure
+                    returns (bytes32)
+                {
+                    return keccak256(abi.encodePacked(a, b));
+                }
+            }
+            """
+        ),
+        fixed=_sol(
+            """
+            contract Merkle {
+                function leaf(string memory a, string memory b)
+                    external
+                    pure
+                    returns (bytes32)
+                {
+                    return keccak256(abi.encode(a, b));
+                }
+            }
+            """
+        ),
+    ),
 )
 
 _BY_CODE = {rule.code: rule for rule in RULES}

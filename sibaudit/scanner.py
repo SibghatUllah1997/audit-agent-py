@@ -1305,6 +1305,31 @@ def _has_top_level_comma(args: str) -> bool:
     return False
 
 
+def _split_top_level_args(args: str) -> list[str]:
+    """Split a call argument list on commas that are not inside nested groups."""
+    parts: list[str] = []
+    depth = 0
+    current: list[str] = []
+    for char in args:
+        if char in "([{":
+            depth += 1
+            current.append(char)
+        elif char in ")]}":
+            depth -= 1
+            current.append(char)
+        elif char == "," and depth == 0:
+            piece = "".join(current).strip()
+            if piece:
+                parts.append(piece)
+            current = []
+        else:
+            current.append(char)
+    piece = "".join(current).strip()
+    if piece:
+        parts.append(piece)
+    return parts
+
+
 def _sends_ether(code: str) -> bool:
     """True if `code` sends ether (not an ERC-20 transfer)."""
     if SELFDESTRUCT_OR_SUICIDE_PATTERN.search(code):
@@ -1645,6 +1670,25 @@ def _detect_incorrect_only_owner(
         )
 
 
+ENCODE_PACKED_PATTERN = re.compile(r"\babi\s*\.\s*encodePacked\s*\(", re.IGNORECASE)
+NAMED_TYPE_PATTERN = re.compile(
+    r"\b(?P<base>string|bytes(?:[1-9]|[12]\d|3[0-2])?|address|bool|u?int(?:\d+)?)"
+    r"(?P<suffix>(?:\s+(?:memory|calldata|storage|payable|public|private|internal|"
+    r"constant|immutable|indexed))*(?:\s*\[[^\]]*\])?(?:\s+(?:memory|calldata|storage))*)"
+    r"\s+(?P<name>[A-Za-z_]\w*)",
+    re.IGNORECASE,
+)
+BYTES_NN_CAST_PATTERN = re.compile(r"^bytes(?:[1-9]|[12]\d|3[0-2])\s*\(", re.IGNORECASE)
+BYTES_CAST_PATTERN = re.compile(r"^bytes\s*\(", re.IGNORECASE)
+STRING_CAST_PATTERN = re.compile(r"^string\s*\(", re.IGNORECASE)
+HEX_LITERAL_PATTERN = re.compile(r"^hex[\"']", re.IGNORECASE)
+BARE_IDENT_PATTERN = re.compile(r"^[A-Za-z_]\w*$")
+MSG_DATA_PATTERN = re.compile(r"\bmsg\.data\b")
+ARRAY_NAME_PATTERN = re.compile(
+    r"\[[^\]]*\]\s+(?:memory|calldata|storage)?\s*(?P<name>[A-Za-z_]\w*)",
+    re.IGNORECASE,
+)
+
 SOLIDITY_PRAGMA_PATTERN = re.compile(r"^\s*pragma\s+solidity\s+(?P<spec>[^;]+);")
 EXACT_VERSION_PATTERN = re.compile(r"^=?\s*\d+\.\d+\.\d+$")
 VERSION_NUMBER_PATTERN = re.compile(r"\d+\.\d+\.\d+")
@@ -1681,6 +1725,82 @@ def _floating_reason(spec: str) -> str | None:
     if "*" in compact or re.search(r"\.[xX]\b", compact):
         return "uses a wildcard version"
     return "does not name one exact compiler version"
+
+
+def _type_is_dynamic(base: str, suffix: str) -> bool:
+    """True for string, unbounded bytes, or any array type."""
+    if "[" in suffix:
+        return True
+    lowered = base.lower()
+    return lowered in {"string", "bytes"}
+
+
+def _dynamic_names_in(text: str) -> set[str]:
+    """Identifiers declared as string, bytes, or an array in ``text``."""
+    names: set[str] = set()
+    for match in NAMED_TYPE_PATTERN.finditer(text):
+        if _type_is_dynamic(match.group("base"), match.group("suffix")):
+            names.add(match.group("name"))
+    for match in ARRAY_NAME_PATTERN.finditer(text):
+        names.add(match.group("name"))
+    return names
+
+
+def _arg_is_dynamic(arg: str, dynamic_names: set[str]) -> bool:
+    """True if a packed argument is a dynamic Solidity value."""
+    stripped = arg.strip()
+    if not stripped:
+        return False
+    if STRING_CAST_PATTERN.match(stripped):
+        return True
+    if BYTES_CAST_PATTERN.match(stripped) and not BYTES_NN_CAST_PATTERN.match(stripped):
+        return True
+    if stripped[0] in {'"', "'"} or HEX_LITERAL_PATTERN.match(stripped):
+        return True
+    if MSG_DATA_PATTERN.search(stripped):
+        return True
+    if BARE_IDENT_PATTERN.fullmatch(stripped):
+        return stripped in dynamic_names
+    return False
+
+
+def _comment_stripped_source(lines: list[str]) -> str:
+    return "\n".join(_without_line_comment(line) for line in lines)
+
+
+def _detect_encode_packed_collision(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    # abi.encodePacked concatenates without a length prefix, so two dynamic
+    # values can be split more than one way and still hash to the same digest.
+    source = _comment_stripped_source(lines)
+    state_names = _dynamic_names_in("\n".join(_state_level_lines(lines)))
+    functions = list(_iter_functions(lines, include_constructors=True))
+    for match in ENCODE_PACKED_PATTERN.finditer(source):
+        args_text = _extract_paren_args(source, match.end() - 1)
+        if args_text is None:
+            continue
+        line_no = source[: match.start()].count("\n") + 1
+        if ignore_next_lines and line_no in ignore_next_lines:
+            continue
+        owner = next((f for f in functions if f.start_line <= line_no <= f.end_line), None)
+        names = set(state_names)
+        if owner is not None:
+            names |= _dynamic_names_in(_function_source(lines, owner))
+        args = _split_top_level_args(args_text)
+        dynamic = [arg for arg in args if _arg_is_dynamic(arg, names)]
+        if len(dynamic) < 2:
+            continue
+        yield Finding(
+            file_path=file_path,
+            line_number=line_no,
+            code="A024",
+            severity="HIGH",
+            message=(
+                "abi.encodePacked of multiple dynamic types can collide; use abi.encode."
+            ),
+            line_text=lines[line_no - 1].rstrip(),
+        )
 
 
 def _detect_floating_pragma(
@@ -1742,6 +1862,7 @@ _DETECTORS = (
     _detect_incorrect_only_owner,
     _detect_ecrecover_without_signer_check,
     _detect_stipend_ether_send,
+    _detect_encode_packed_collision,
     _detect_floating_pragma,
 )
 

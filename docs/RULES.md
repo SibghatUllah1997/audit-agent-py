@@ -842,3 +842,43 @@ contract Vault {
     uint256 public total;
 }
 ```
+
+## A024: `abi.encodePacked` of dynamic types can collide
+
+Severity: **HIGH**
+
+`abi.encodePacked` concatenates values without a length prefix. Two dynamic values such as `string` or `bytes` can be split in more than one way and still hash to the same digest, so signatures, merkle leaves, and uniqueness checks built on that hash can be forged. Use `abi.encode`, which length-prefixes each value.
+
+Flagged:
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
+
+contract Merkle {
+    function leaf(string memory a, string memory b)
+        external
+        pure
+        returns (bytes32)
+    {
+        return keccak256(abi.encodePacked(a, b));
+    }
+}
+```
+
+Fixed:
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
+
+contract Merkle {
+    function leaf(string memory a, string memory b)
+        external
+        pure
+        returns (bytes32)
+    {
+        return keccak256(abi.encode(a, b));
+    }
+}
+```

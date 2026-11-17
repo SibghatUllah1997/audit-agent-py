@@ -36,6 +36,7 @@ Rules
 | A021 | HIGH     | `ecrecover` without a zero-address or identity check on the signer |
 | A022 | MEDIUM   | Ether `transfer`/`send` (2300-gas stipend) used instead of `call` |
 | A023 | LOW      | Floating Solidity pragma (`^`, `~`, `>=`) in a deployable source |
+| A024 | HIGH     | `abi.encodePacked` of dynamic types can collide |
 
 Install
 - Python 3.11+

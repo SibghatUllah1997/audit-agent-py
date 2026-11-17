@@ -223,6 +223,11 @@ _HINTS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
         "Pin the pragma to the exact compiler you test and deploy with (pragma solidity 0.8.20;).",
         (),
     ),
+    (
+        "A024",
+        "Use abi.encode instead of abi.encodePacked when hashing two or more dynamic values.",
+        (),
+    ),
 )
 
 
