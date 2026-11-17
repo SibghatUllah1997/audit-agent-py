@@ -78,3 +78,11 @@ def test_sample_contract_flags_floating_pragma() -> None:
     assert len(floating) == 1
     assert floating[0].line_number == 2
     assert "^0.7.6" in floating[0].message
+
+
+def test_sample_contract_flags_encode_packed_collision() -> None:
+    findings = scan_paths([str(EXAMPLES)])
+    packed = [f for f in findings if f.code == "A024"]
+    assert packed
+    assert any("encodePacked" in f.line_text for f in packed)
+    assert any("dynamic" in f.message for f in packed)

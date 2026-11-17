@@ -144,3 +144,11 @@ contract StipendPay {
         to.transfer(address(this).balance);
     }
 }
+
+// Packed dynamic values can be split more than one way and still hash the same.
+contract PackedLeaf {
+    function leaf(string memory a, string memory b) external pure returns (bytes32) {
+        // A024
+        return keccak256(abi.encodePacked(a, b));
+    }
+}
