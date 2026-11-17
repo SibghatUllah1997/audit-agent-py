@@ -38,6 +38,7 @@ Rules
 | A023 | LOW      | Floating Solidity pragma (`^`, `~`, `>=`) in a deployable source |
 | A024 | HIGH     | `abi.encodePacked` of dynamic types can collide |
 | A025 | HIGH     | Upgradeable initializer left public, or `_disableInitializers` missing |
+| A026 | HIGH     | Signature replay: signed data has no nonce, deadline, or chain id |
 
 Install
 - Python 3.11+

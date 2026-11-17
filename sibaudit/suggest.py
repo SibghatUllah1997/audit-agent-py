@@ -243,6 +243,11 @@ _HINTS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
                 "implementation cannot be initialized.",
             ),
         ),
+    ),    (
+        "A026",
+        "Hash a per-signer nonce, a deadline and block.chainid (or an EIP-712 domain "
+        "separator) into the signed digest, and consume the nonce on use.",
+        (),
     ),
 )
 
