@@ -37,6 +37,7 @@ Rules
 | A022 | MEDIUM   | Ether `transfer`/`send` (2300-gas stipend) used instead of `call` |
 | A023 | LOW      | Floating Solidity pragma (`^`, `~`, `>=`) in a deployable source |
 | A024 | HIGH     | `abi.encodePacked` of dynamic types can collide |
+| A025 | HIGH     | Upgradeable initializer left public, or `_disableInitializers` missing |
 
 Install
 - Python 3.11+

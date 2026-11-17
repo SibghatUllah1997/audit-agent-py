@@ -59,7 +59,8 @@ INCREMENT_PATTERN = re.compile(
 )
 DELETE_STATE_PATTERN = re.compile(r"\bdelete\s+[A-Za-z_]\w*")
 ACCESS_MODIFIER_PATTERN = re.compile(
-    r"\bonly[A-Z]\w*\b|\b(?:onlyRole|restricted|auth|requiresAuth)\b"
+    r"\bonly[A-Z]\w*\b|\b(?:onlyRole|restricted|auth|requiresAuth|"
+    r"initializer|reinitializer)\b"
 )
 SENDER_GUARD_PATTERN = re.compile(
     r"require\s*\(\s*(?:msg\.sender\s*==|[A-Za-z_]\w*\s*==\s*msg\.sender)"
@@ -1688,6 +1689,15 @@ ARRAY_NAME_PATTERN = re.compile(
     r"\[[^\]]*\]\s+(?:memory|calldata|storage)?\s*(?P<name>[A-Za-z_]\w*)",
     re.IGNORECASE,
 )
+INITIALIZER_LOCK_MODIFIERS = frozenset(
+    {"initializer", "reinitializer", "onlyinitializing"}
+)
+INITIALIZER_FUNC_NAMES = frozenset({"initialize", "reinitialize"})
+UPGRADEABLE_BASE_HINTS = ("initializable", "upgradeable")
+UPGRADE_FUNC_NAMES = frozenset(
+    {"upgradeto", "upgradetoandcall", "_authorizeupgrade"}
+)
+DISABLE_INITIALIZERS_CALL_PATTERN = re.compile(r"\b_disableInitializers\s*\(")
 
 SOLIDITY_PRAGMA_PATTERN = re.compile(r"^\s*pragma\s+solidity\s+(?P<spec>[^;]+);")
 EXACT_VERSION_PATTERN = re.compile(r"^=?\s*\d+\.\d+\.\d+$")
@@ -1803,6 +1813,133 @@ def _detect_encode_packed_collision(
         )
 
 
+def _is_initializer_function(name: str) -> bool:
+    lowered = name.lower()
+    return lowered in INITIALIZER_FUNC_NAMES or lowered.startswith("initialize")
+
+
+def _has_initializer_lock(func: _FunctionInfo) -> bool:
+    return any(mod.lower() in INITIALIZER_LOCK_MODIFIERS for mod in func.modifiers)
+
+
+def _looks_upgradeable(contract: _ContractInfo, functions: Sequence[_FunctionInfo]) -> bool:
+    for base in contract.bases:
+        lowered = base.lower()
+        if any(hint in lowered for hint in UPGRADEABLE_BASE_HINTS) or lowered == "uups":
+            return True
+    owned = [
+        func
+        for func in functions
+        if contract.start_line <= func.start_line <= contract.end_line
+    ]
+    for func in owned:
+        if _has_initializer_lock(func):
+            return True
+        if func.name.lower() in UPGRADE_FUNC_NAMES:
+            return True
+    return False
+
+
+def _constructor_disables_initializers(
+    contract: _ContractInfo, functions: Sequence[_FunctionInfo], lines: list[str]
+) -> bool:
+    for func in functions:
+        if func.name != "constructor":
+            continue
+        if not (contract.start_line <= func.start_line <= contract.end_line):
+            continue
+        if DISABLE_INITIALIZERS_CALL_PATTERN.search(_function_source(lines, func)):
+            return True
+    return False
+
+
+def _family_disables_initializers(
+    contract: _ContractInfo,
+    by_name: dict[str, _ContractInfo],
+    functions: Sequence[_FunctionInfo],
+    lines: list[str],
+) -> bool:
+    for name in _contract_family_names(contract, by_name):
+        member = by_name.get(name)
+        if member is None:
+            continue
+        if _constructor_disables_initializers(member, functions, lines):
+            return True
+    return False
+
+
+def _detect_upgradeable_initializer(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    # Proxy implementations that leave initialize() public without the
+    # initializer lock can be taken over, and implementations that skip
+    # _disableInitializers() in the constructor can be initialized directly.
+    contracts = [c for c in _iter_contracts(lines) if c.kind == "contract"]
+    if not contracts:
+        return
+    by_name = {c.name: c for c in contracts}
+    functions = list(_iter_functions(lines, include_constructors=True))
+    for contract in contracts:
+        owned = [
+            func
+            for func in functions
+            if contract.start_line <= func.start_line <= contract.end_line
+        ]
+        for func in owned:
+            if ignore_next_lines and func.start_line in ignore_next_lines:
+                continue
+            if not _is_initializer_function(func.name):
+                continue
+            if func.is_view_or_pure:
+                continue
+            if func.visibility in {"internal", "private"}:
+                continue
+            if _has_initializer_lock(func):
+                continue
+            yield Finding(
+                file_path=file_path,
+                line_number=func.start_line,
+                code="A025",
+                severity="HIGH",
+                message=(
+                    f'Upgradeable initializer "{func.name}" is {func.visibility or "public"} '
+                    "without an initializer lock."
+                ),
+                line_text=lines[func.start_line - 1].rstrip(),
+            )
+        if contract.is_abstract:
+            continue
+        if not _looks_upgradeable(contract, functions):
+            continue
+        if _family_disables_initializers(contract, by_name, functions, lines):
+            continue
+        ctor = next((f for f in owned if f.name == "constructor"), None)
+        if ctor is not None and ignore_next_lines and ctor.start_line in ignore_next_lines:
+            continue
+        if ctor is None and ignore_next_lines and contract.start_line in ignore_next_lines:
+            continue
+        if ctor is None:
+            line_no = contract.start_line
+            message = (
+                f'Upgradeable contract "{contract.name}" has no constructor calling '
+                "_disableInitializers()."
+            )
+        else:
+            line_no = ctor.start_line
+            message = (
+                f'Upgradeable contract "{contract.name}" constructor does not call '
+                "_disableInitializers()."
+            )
+        yield Finding(
+            file_path=file_path,
+            line_number=line_no,
+            code="A025",
+            severity="HIGH",
+            message=message,
+            line_text=lines[line_no - 1].rstrip(),
+        )
+
+
 def _detect_floating_pragma(
     lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
 ) -> Iterator[Finding]:
@@ -1863,6 +2000,7 @@ _DETECTORS = (
     _detect_ecrecover_without_signer_check,
     _detect_stipend_ether_send,
     _detect_encode_packed_collision,
+    _detect_upgradeable_initializer,
     _detect_floating_pragma,
 )
 

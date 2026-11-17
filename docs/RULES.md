@@ -882,3 +882,62 @@ contract Merkle {
     }
 }
 ```
+
+## A025: Upgradeable initializer left public, or `_disableInitializers` missing
+
+Severity: **HIGH**
+
+A public `initialize` without the `initializer` lock can be called more than once and taken over. An implementation that never calls `_disableInitializers` in its constructor can also be initialized directly, which lets an attacker own the implementation and, on UUPS proxies, the proxy behind it. Lock the initializer and disable it in the constructor.
+
+Flagged:
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
+
+abstract contract Initializable {
+    function _disableInitializers() internal {}
+}
+
+contract Vault is Initializable {
+    address public owner;
+
+    function initialize(address owner_) public {
+        owner = owner_;
+    }
+}
+```
+
+Fixed:
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
+
+abstract contract Initializable {
+    uint64 private _initialized;
+
+    modifier initializer() {
+        require(_initialized == 0, "init");
+        _initialized = 1;
+        _;
+    }
+
+    function _disableInitializers() internal {
+        _initialized = type(uint64).max;
+    }
+}
+
+contract Vault is Initializable {
+    address public owner;
+
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(address owner_) public initializer {
+        require(owner_ != address(0), "zero");
+        owner = owner_;
+    }
+}
+```

@@ -228,6 +228,22 @@ _HINTS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
         "Use abi.encode instead of abi.encodePacked when hashing two or more dynamic values.",
         (),
     ),
+    (
+        "A025",
+        "Add the initializer modifier to initialize() and call "
+        "_disableInitializers() in the constructor.",
+        (
+            (
+                "without an initializer lock",
+                "Add the initializer (or reinitializer) modifier so initialize() cannot run twice.",
+            ),
+            (
+                "_disableInitializers",
+                "Add a constructor that calls _disableInitializers() so the "
+                "implementation cannot be initialized.",
+            ),
+        ),
+    ),
 )
 
 
