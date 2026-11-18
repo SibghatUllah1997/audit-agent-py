@@ -185,3 +185,11 @@ contract ReplayVoucher {
         credit[msg.sender] += amount;
     }
 }
+
+// code.length == 0 does not prove the caller is an EOA (constructors, EIP-7702).
+contract EoaGate {
+    function enter() external {
+        // A027
+        require(msg.sender.code.length == 0, "no contracts");
+    }
+}
