@@ -7,7 +7,14 @@ from pathlib import Path
 
 from .baseline import BaselineError, apply_baseline, load_baseline, write_baseline
 from .config import ConfigError, apply_config, find_and_load_config, load_config
-from .filters import FilterError, apply_filters, parse_codes, parse_severity
+from .filters import (
+    FilterError,
+    apply_filters,
+    parse_codes,
+    parse_fail_on,
+    parse_severity,
+    should_fail,
+)
 from .report import format_github_annotations, format_summary
 from .rules import format_explain, format_rule_list, get_rule
 from .scanner import Finding, scan_paths
@@ -88,6 +95,15 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         default=[],
         metavar="CODE",
         help="Skip these rule codes (repeatable, comma-separated).",
+    )
+    parser.add_argument(
+        "--fail-on",
+        metavar="LEVEL",
+        default=None,
+        help=(
+            "Exit 1 only when a reported finding is at or above LEVEL (LOW, MEDIUM, "
+            "HIGH); 'never' always exits 0. Default 'any': exit 1 on any finding."
+        ),
     )
     parser.add_argument(
         "--baseline",
@@ -191,6 +207,7 @@ def main(argv: list[str] | None = None) -> None:
             only=parse_codes(_flag_or_env(ns.only, "SIBAUDIT_ONLY")),
             except_codes=parse_codes(_flag_or_env(ns.except_codes, "SIBAUDIT_EXCEPT")),
         )
+        fail_on = parse_fail_on(ns.fail_on or os.environ.get("SIBAUDIT_FAIL_ON"))
     except FilterError as exc:
         print(f"error: {exc}", file=sys.stderr)
         sys.exit(2)
@@ -237,8 +254,7 @@ def main(argv: list[str] | None = None) -> None:
                 file=sys.stderr,
             )
     _print_findings(findings, ns.format)
-    # Exit non-zero if any findings
-    sys.exit(1 if findings else 0)
+    sys.exit(1 if should_fail(findings, fail_on) else 0)
 
 
 def _flag_or_env(flag_values: list[str], env_name: str) -> list[str]:
