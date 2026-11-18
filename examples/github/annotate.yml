@@ -1,6 +1,7 @@
 # Copy this file to .github/workflows/sibaudit.yml in a Solidity project.
 # Findings are printed as workflow commands and show up as inline annotations
 # on pull requests. The job fails when the scan reports anything.
+# Scanning `.` uses Foundry src/ and Hardhat contracts/ when those configs exist.
 name: sibaudit
 
 on:

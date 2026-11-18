@@ -106,6 +106,29 @@ def test_signature_replay_rule_is_documented_and_day_39_is_done() -> None:
         "(signed data missing nonce, deadline, or chain id)"
     ) in roadmap
 
+
+def test_extcodesize_and_layout_discovery_are_documented_and_days_40_41_are_done() -> None:
+    text = README.read_text(encoding="utf-8")
+    assert "| A027 | HIGH" in text
+    assert "foundry.toml" in text
+    assert "hardhat.config.js" in text
+    assert "src/" in text and "contracts/" in text
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert "## 2026-11-18" in changelog
+    assert "A027" in changelog
+    assert "Foundry" in changelog
+    assert "Hardhat" in changelog
+    roadmap = ROADMAP.read_text(encoding="utf-8")
+    assert (
+        "- [x] Day 40: Add rule A027: `extcodesize == 0` used as an EOA check "
+        "(breaks under constructor and EIP-7702)"
+    ) in roadmap
+    assert (
+        "- [x] Day 41: Discover Foundry and Hardhat layouts (`src/`, `contracts/`) "
+        "when a directory is scanned with no paths"
+    ) in roadmap
+
+
 def test_config_and_filters_are_documented_and_days_31_32_are_done() -> None:
     from sibaudit.config import load_config
 

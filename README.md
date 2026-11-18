@@ -182,6 +182,10 @@ python3 -m sibaudit --except A017,A010 path/to/contracts
 - Unknown codes or severities exit with code 2.
 - If the flags are omitted, `SIBAUDIT_MIN_SEVERITY`, `SIBAUDIT_ONLY`, and `SIBAUDIT_EXCEPT` are read instead. An explicit flag always wins.
 
+Project layouts
+
+With no path arguments, sibaudit scans the current directory. If that directory is a Foundry project (`foundry.toml`) or a Hardhat project (`hardhat.config.js` / `.ts` and the other config suffixes), it walks `src/` and `contracts/` and skips `lib/`, `test/`, and `node_modules`. Foundry's `[profile.default] src` path is honored when set. Pass a file or folder explicitly to scan something else (`sibaudit test/`, `sibaudit lib/dep`). `--include` still searches the whole tree.
+
 Include and exclude files
 
 Use `--include` and `--exclude` (both repeatable) to pick which `.sol` files are scanned:
@@ -290,7 +294,7 @@ Use it as a GitHub Action
 
 - It installs `sibaudit`, scans `.` with `--format github`, and fails the job when findings exist.
 - Annotations still show on the pull request when the step fails.
-- Change the scan path if contracts do not live at the repo root.
+- Scanning `.` picks up Foundry `src/` and Hardhat `contracts/` when those configs are present. Change the scan path for other layouts.
 - Set repository variables `SIBAUDIT_MIN_SEVERITY`, `SIBAUDIT_ONLY`, and `SIBAUDIT_EXCEPT` to apply the same filters as the CLI flags. Leave them unset for a full scan.
 
 Ignoring one line

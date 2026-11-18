@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-18
+- Added rule A027 to flag `extcodesize == 0` and `.code.length == 0` used as an EOA check, which breaks for constructors and EIP-7702 accounts.
+- When a Foundry or Hardhat directory is scanned, sibaudit now looks in `src/` and `contracts/` instead of walking lib, test, and node_modules.
+- Marked days 40 and 41 complete on the roadmap.
+
 ## 2026-11-17
 - Added rule A024 to flag `abi.encodePacked` of two or more dynamic values (`string`, `bytes`, arrays), which can hash-collide; prefer `abi.encode`.
 - Added rule A025 to flag a public upgradeable `initialize` without an initializer lock, and implementations that skip `_disableInitializers()` in the constructor.
