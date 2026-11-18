@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-18
+- Added rule A027 to flag `extcodesize` or `address.code.length` compared against zero to tell an EOA from a contract; a contract in its constructor has no code and an EIP-7702 delegated EOA has code. A target-has-code check before a call is not flagged.
+- Marked day 40 complete on the roadmap.
+
 ## 2026-11-17
 - Added rule A024 to flag `abi.encodePacked` of two or more dynamic values (`string`, `bytes`, arrays), which can hash-collide; prefer `abi.encode`.
 - Added rule A025 to flag a public upgradeable `initialize` without an initializer lock, and implementations that skip `_disableInitializers()` in the constructor.

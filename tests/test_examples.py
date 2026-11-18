@@ -103,3 +103,11 @@ def test_sample_contract_flags_signature_replay() -> None:
     assert len(replay) == 1
     assert "ecrecover" in replay[0].line_text
     assert "no nonce, deadline, chain id" in replay[0].message
+
+
+def test_sample_contract_flags_code_size_eoa_check() -> None:
+    findings = scan_paths([str(EXAMPLES)])
+    checks = [f for f in findings if f.code == "A027"]
+    assert len(checks) == 1
+    assert "code.length == 0" in checks[0].line_text
+    assert "EIP-7702" in checks[0].message

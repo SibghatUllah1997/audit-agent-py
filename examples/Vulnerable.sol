@@ -185,3 +185,15 @@ contract ReplayVoucher {
         credit[msg.sender] += amount;
     }
 }
+
+// "EOA only" gate that a contract passes from its constructor and that blocks EIP-7702 wallets.
+contract HumanOnlyDrop {
+    mapping(address => bool) public claimed;
+
+    function claim() external {
+        // A027
+        require(msg.sender.code.length == 0, "no contracts");
+        require(!claimed[msg.sender], "claimed");
+        claimed[msg.sender] = true;
+    }
+}

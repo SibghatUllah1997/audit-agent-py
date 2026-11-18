@@ -94,6 +94,7 @@ Example output (real):
 /workspace/examples/Vulnerable.sol:164: A025 Upgradeable initializer "initialize" is public without an initializer lock.
 /workspace/examples/Vulnerable.sol:161: A025 Upgradeable contract "OpenVault" has no constructor calling _disableInitializers().
 /workspace/examples/Vulnerable.sol:183: A026 Signature checked in "redeem" can be replayed; the signed data has no nonce, deadline, chain id.
+/workspace/examples/Vulnerable.sol:195: A027 Code size of zero used as an EOA check; it is also zero for a contract still in its constructor, and an EIP-7702 delegated EOA has code.
 ```
 
 Notes
