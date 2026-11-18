@@ -46,6 +46,7 @@ def test_workflow_honors_filter_env_vars() -> None:
     assert "SIBAUDIT_MIN_SEVERITY: ${{ vars.SIBAUDIT_MIN_SEVERITY }}" in text
     assert "SIBAUDIT_ONLY: ${{ vars.SIBAUDIT_ONLY }}" in text
     assert "SIBAUDIT_EXCEPT: ${{ vars.SIBAUDIT_EXCEPT }}" in text
+    assert "SIBAUDIT_FAIL_ON: ${{ vars.SIBAUDIT_FAIL_ON }}" in text
     # The command stays flag-free so the Action picks filters up from env.
     scan_lines = [
         ln for ln in text.splitlines() if "python3 -m sibaudit --format github" in ln

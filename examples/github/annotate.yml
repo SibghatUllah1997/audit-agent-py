@@ -1,6 +1,7 @@
 # Copy this file to .github/workflows/sibaudit.yml in a Solidity project.
 # Findings are printed as workflow commands and show up as inline annotations
-# on pull requests. The job fails when the scan reports anything.
+# on pull requests. The job fails when the scan reports anything, unless
+# SIBAUDIT_FAIL_ON sets a severity floor for failing.
 # Scanning `.` uses Foundry src/ and Hardhat contracts/ when those configs exist.
 name: sibaudit
 
@@ -32,7 +33,9 @@ jobs:
           # SIBAUDIT_MIN_SEVERITY: HIGH | MEDIUM | LOW
           # SIBAUDIT_ONLY: A008,A009
           # SIBAUDIT_EXCEPT: A017
+          # SIBAUDIT_FAIL_ON: HIGH | MEDIUM | LOW | never
           SIBAUDIT_MIN_SEVERITY: ${{ vars.SIBAUDIT_MIN_SEVERITY }}
           SIBAUDIT_ONLY: ${{ vars.SIBAUDIT_ONLY }}
           SIBAUDIT_EXCEPT: ${{ vars.SIBAUDIT_EXCEPT }}
+          SIBAUDIT_FAIL_ON: ${{ vars.SIBAUDIT_FAIL_ON }}
         run: python3 -m sibaudit --format github .

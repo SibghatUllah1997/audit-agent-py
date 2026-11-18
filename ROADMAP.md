@@ -46,6 +46,6 @@ More rules and scanner UX, still one small shippable step per day. Keep the anal
 - [x] Day 39: Add rule A026: signature-replay risk (signed data missing nonce, deadline, or chain id)
 - [x] Day 40: Add rule A027: `extcodesize == 0` used as an EOA check (breaks under constructor and EIP-7702)
 - [x] Day 41: Discover Foundry and Hardhat layouts (`src/`, `contracts/`) when a directory is scanned with no paths
-- [ ] Day 42: Add an HTML summary report and a `--fail-on` exit policy (for example, fail only on high)
+- [x] Day 42: Add an HTML summary report and a `--fail-on` exit policy (for example, fail only on high)
 - [ ] Day 43: Add a baseline auto-update command that records current findings without hiding new ones later
 - [ ] Day 44: Tag v0.2.0 and publish a rule catalog with examples for A021–A027
