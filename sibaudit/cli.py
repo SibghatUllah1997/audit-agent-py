@@ -15,7 +15,7 @@ from .filters import (
     parse_severity,
     should_fail,
 )
-from .report import format_github_annotations, format_summary
+from .report import format_github_annotations, format_html, format_summary
 from .rules import format_explain, format_rule_list, get_rule
 from .scanner import Finding, scan_paths
 from .suggest import (
@@ -95,6 +95,15 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         default=[],
         metavar="CODE",
         help="Skip these rule codes (repeatable, comma-separated).",
+    )
+    parser.add_argument(
+        "--html-report",
+        metavar="FILE",
+        default=None,
+        help=(
+            "Also write a self-contained HTML summary of the reported findings to FILE "
+            "(for example a CI artifact). Normal output still goes to stdout."
+        ),
     )
     parser.add_argument(
         "--fail-on",
@@ -254,6 +263,12 @@ def main(argv: list[str] | None = None) -> None:
                 file=sys.stderr,
             )
     _print_findings(findings, ns.format)
+    if ns.html_report:
+        try:
+            Path(ns.html_report).write_text(format_html(findings, root), encoding="utf-8")
+        except OSError as exc:
+            print(f"error: cannot write HTML report: {exc}", file=sys.stderr)
+            sys.exit(2)
     sys.exit(1 if should_fail(findings, fail_on) else 0)
 
 

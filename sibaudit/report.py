@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -128,3 +129,114 @@ def format_github_annotations(
             f"::{level} file={file_param},line={finding.line_number},title={title}::{message}"
         )
     return "\n".join(lines)
+
+
+_HTML_STYLE = """
+body { font-family: system-ui, sans-serif; margin: 2rem; color: #1f2328; }
+h1 { font-size: 1.4rem; }
+h2 { font-size: 1.1rem; margin-top: 1.5rem; }
+table { border-collapse: collapse; margin-top: 0.5rem; }
+th, td { border: 1px solid #d0d7de; padding: 0.3rem 0.6rem; text-align: left; vertical-align: top; }
+th { background: #f6f8fa; }
+td.num { text-align: right; }
+code { font-family: ui-monospace, monospace; font-size: 0.9em; }
+.sev-HIGH { color: #b42318; font-weight: 600; }
+.sev-MEDIUM { color: #9a6700; font-weight: 600; }
+.sev-LOW { color: #57606a; }
+""".strip()
+
+
+def _cell(text: object, css: str | None = None) -> str:
+    attr = f' class="{css}"' if css else ""
+    return f"<td{attr}>{html.escape(str(text))}</td>"
+
+
+def _severity_rank(severity: str) -> int:
+    if severity in SEVERITY_ORDER:
+        return SEVERITY_ORDER.index(severity)
+    return len(SEVERITY_ORDER)
+
+
+def format_html(findings: Sequence[Finding], root: Path | None = None) -> str:
+    """Render a self-contained HTML report: counts, then every finding.
+
+    The page has no scripts or external assets, and every value taken from
+    the scanned sources is escaped. Output is deterministic (no timestamp),
+    so two runs over the same code produce the same file. Paths are shown
+    relative to ``root`` when they sit under it.
+    """
+    from .rules import get_rule
+
+    summary = summarize(findings)
+    noun = "finding" if summary.total == 1 else "findings"
+    out = [
+        "<!DOCTYPE html>",
+        '<html lang="en">',
+        "<head>",
+        '<meta charset="utf-8">',
+        "<title>sibaudit report</title>",
+        f"<style>\n{_HTML_STYLE}\n</style>",
+        "</head>",
+        "<body>",
+        "<h1>sibaudit report</h1>",
+        f'<p id="total">{summary.total} {noun}</p>',
+    ]
+    if summary.total:
+        out.append("<h2>By severity</h2>")
+        out.append("<table><tr><th>Severity</th><th>Count</th></tr>")
+        for severity, count in summary.by_severity:
+            out.append(
+                f"<tr>{_cell(severity, f'sev-{severity}')}{_cell(count, 'num')}</tr>"
+            )
+        out.append("</table>")
+
+        out.append("<h2>By rule</h2>")
+        out.append(
+            "<table><tr><th>Rule</th><th>Severity</th><th>Title</th><th>Count</th></tr>"
+        )
+        for code, count in summary.by_code:
+            severity = summary.severity_by_code[code]
+            rule = get_rule(code)
+            title = rule.title if rule else ""
+            out.append(
+                f"<tr>{_cell(code)}{_cell(severity, f'sev-{severity}')}"
+                f"{_cell(title)}{_cell(count, 'num')}</tr>"
+            )
+        out.append("</table>")
+
+        out.append("<h2>Findings</h2>")
+        out.append(
+            "<table><tr><th>Severity</th><th>Rule</th><th>Location</th>"
+            "<th>Message</th><th>Line</th></tr>"
+        )
+        ordered = sorted(
+            findings,
+            key=lambda f: (
+                _severity_rank(f.severity),
+                str(f.file_path),
+                f.line_number,
+                f.code,
+            ),
+        )
+        for finding in ordered:
+            location = f"{_display_path(Path(finding.file_path), root)}:{finding.line_number}"
+            message = finding.message
+            if finding.suggestion:
+                message = f"{message} Hint: {finding.suggestion}"
+            out.append(
+                f"<tr>{_cell(finding.severity, f'sev-{finding.severity}')}"
+                f"{_cell(finding.code)}{_cell(location)}{_cell(message)}"
+                f"<td><code>{html.escape(finding.line_text.strip())}</code></td></tr>"
+            )
+        out.append("</table>")
+    out.extend(["</body>", "</html>"])
+    return "\n".join(out) + "\n"
+
+
+def _display_path(path: Path, root: Path | None) -> str:
+    if root is not None:
+        try:
+            return path.resolve().relative_to(root.resolve()).as_posix()
+        except ValueError:
+            pass
+    return str(path)
