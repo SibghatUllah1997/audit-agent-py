@@ -931,6 +931,38 @@ RULES: tuple[Rule, ...] = (
             """
         ),
     ),
+    Rule(
+        code="A027",
+        severity="HIGH",
+        title="`extcodesize == 0` used as an EOA check",
+        rationale=(
+            "A zero code size does not mean the caller is an EOA. During construction a "
+            "contract has no code yet, so `extcodesize` and `address.code.length` are zero "
+            "and the check lets it in. EIP-7702 delegated accounts are EOAs that do have "
+            "code, so the same check also rejects real users. Do not gate privileged "
+            "actions on code size; authenticate the caller instead."
+        ),
+        flagged=_sol(
+            """
+            contract Gate {
+                function enter() external {
+                    require(msg.sender.code.length == 0, "no contracts");
+                }
+            }
+            """
+        ),
+        fixed=_sol(
+            """
+            contract Gate {
+                mapping(address => bool) public allowed;
+
+                function enter() external {
+                    require(allowed[msg.sender], "not allowed");
+                }
+            }
+            """
+        ),
+    ),
 )
 
 _BY_CODE = {rule.code: rule for rule in RULES}

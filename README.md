@@ -39,6 +39,7 @@ Rules
 | A024 | HIGH     | `abi.encodePacked` of dynamic types can collide |
 | A025 | HIGH     | Upgradeable initializer left public, or `_disableInitializers` missing |
 | A026 | HIGH     | Signature replay: signed data has no nonce, deadline, or chain id |
+| A027 | HIGH     | `extcodesize` / `.code.length == 0` used as an EOA check |
 
 Install
 - Python 3.11+

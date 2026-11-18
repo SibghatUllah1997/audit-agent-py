@@ -2032,6 +2032,262 @@ def _detect_signature_replay(
             )
 
 
+EXTCODESIZE_PATTERN = re.compile(r"\bextcodesize\s*\(", re.IGNORECASE)
+CODE_LENGTH_PATTERN = re.compile(r"\.code\.length\b", re.IGNORECASE)
+THIS_CODE_LENGTH_PATTERN = re.compile(
+    r"(?:address\s*\(\s*this\s*\)|\bthis)\s*\.\s*code\s*\.\s*length\b",
+    re.IGNORECASE,
+)
+IDENT_ASSIGN_BEFORE_PATTERN = re.compile(r"\b(?P<name>[A-Za-z_]\w*)\s*:?=\s*")
+ZEROISH_LITERAL_PATTERN = re.compile(r"^(?:0(?:x0+)?|1)$", re.IGNORECASE)
+YUL_SIZE_CMP = frozenset({"eq", "lt", "gt", "slt", "sgt", "iszero"})
+THIS_ACCOUNT_ARGS = frozenset({"address(this)", "this", "address()"})
+CMP_OPS = ("==", "!=", ">=", "<=", ">", "<")
+ASSIGN_SKIP_FOR_SIZE = ASSIGN_SKIP_NAMES | {"let"}
+
+
+def _skip_ws_left(text: str, index: int) -> int:
+    while index > 0 and text[index - 1] in WS_CHARS:
+        index -= 1
+    return index
+
+
+def _matching_open(text: str, close_index: int) -> int | None:
+    closer = text[close_index]
+    opener = {")": "(", "]": "["}.get(closer)
+    if opener is None:
+        return None
+    depth = 0
+    for index in range(close_index, -1, -1):
+        char = text[index]
+        if char == closer:
+            depth += 1
+        elif char == opener:
+            depth -= 1
+            if depth == 0:
+                return index
+    return None
+
+
+def _ident_start(text: str, index: int) -> int:
+    while index > 0 and (text[index - 1].isalnum() or text[index - 1] == "_"):
+        index -= 1
+    return index
+
+
+def _receiver_start(text: str, dot_index: int) -> int:
+    """Start of the receiver of a `.code.length` access at ``dot_index``."""
+    index = _skip_ws_left(text, dot_index)
+    while index > 0:
+        index = _skip_ws_left(text, index)
+        if index > 0 and text[index - 1] in ")]":
+            open_index = _matching_open(text, index - 1)
+            if open_index is None:
+                break
+            index = _skip_ws_left(text, open_index)
+            index = _ident_start(text, index)
+            index = _skip_ws_left(text, index)
+            if index > 0 and text[index - 1] == ".":
+                index -= 1
+                continue
+            break
+        if index > 0 and (text[index - 1].isalnum() or text[index - 1] == "_"):
+            index = _ident_start(text, index)
+            index = _skip_ws_left(text, index)
+            if index > 0 and text[index - 1] == ".":
+                index -= 1
+                continue
+            break
+        break
+    return index
+
+
+def _ident_before_open_paren(text: str, open_index: int) -> str | None:
+    index = _skip_ws_left(text, open_index)
+    end = index
+    index = _ident_start(text, index)
+    name = text[index:end]
+    return name or None
+
+
+def _literal_is_zeroish(text: str) -> bool:
+    return bool(ZEROISH_LITERAL_PATTERN.match(text.strip()))
+
+
+def _read_literal(text: str, index: int, *, reverse: bool) -> str:
+    if reverse:
+        end = index
+        while end >= 0 and text[end] in WS_CHARS:
+            end -= 1
+        start = end
+        while start >= 0 and (text[start].isalnum() or text[start] == "_"):
+            start -= 1
+        return text[start + 1 : end + 1]
+    start = index
+    n = len(text)
+    while start < n and text[start] in WS_CHARS:
+        start += 1
+    end = start
+    while end < n and (text[end].isalnum() or text[end] == "_"):
+        end += 1
+    return text[start:end]
+
+
+def _compared_to_zeroish(text: str, start: int, end: int) -> bool:
+    """True if ``text[start:end]`` is compared with 0 or 1 using ``==`` / ``>`` / etc."""
+    index = end
+    n = len(text)
+    while index < n and text[index] in WS_CHARS:
+        index += 1
+    for op in CMP_OPS:
+        if text.startswith(op, index):
+            return _literal_is_zeroish(_read_literal(text, index + len(op), reverse=False))
+    index = start
+    while index > 0 and text[index - 1] in WS_CHARS:
+        index -= 1
+    for op in CMP_OPS:
+        if index >= len(op) and text[index - len(op) : index] == op:
+            return _literal_is_zeroish(_read_literal(text, index - len(op) - 1, reverse=True))
+    return False
+
+
+def _yul_cmp_around_call(text: str, start: int) -> bool:
+    """True if ``extcodesize(...)`` is an argument of ``iszero`` / ``eq`` / ``lt`` / ``gt``."""
+    index = _skip_ws_left(text, start)
+    if index > 0 and text[index - 1] == "(":
+        name = _ident_before_open_paren(text, index - 1)
+        if name is not None and name.lower() in YUL_SIZE_CMP:
+            return True
+    if index > 0 and text[index - 1] == ",":
+        first_arg_end = _skip_ws_left(text, index - 1)
+        first_arg_start = _ident_start(text, first_arg_end)
+        open_index = _skip_ws_left(text, first_arg_start)
+        if open_index > 0 and text[open_index - 1] == "(":
+            name = _ident_before_open_paren(text, open_index - 1)
+            return name is not None and name.lower() in YUL_SIZE_CMP
+    return False
+
+
+def _is_this_account(args: str) -> bool:
+    compact = re.sub(r"\s+", "", args).lower()
+    return compact in THIS_ACCOUNT_ARGS
+
+
+def _lhs_assigned_in(chunk: str) -> str | None:
+    matches = list(IDENT_ASSIGN_BEFORE_PATTERN.finditer(chunk))
+    if not matches:
+        return None
+    name = matches[-1].group("name")
+    if name.lower() in ASSIGN_SKIP_FOR_SIZE:
+        return None
+    return name
+
+
+def _assigned_size_name(source: str, expr_start: int, expr_end: int) -> str | None:
+    bound = max(
+        source.rfind(";", 0, expr_start),
+        source.rfind("{", 0, expr_start),
+        source.rfind("}", 0, expr_start),
+        source.rfind("\n", 0, expr_start),
+    )
+    return _lhs_assigned_in(source[bound + 1 : expr_end])
+
+
+def _name_tested_as_zero_size(text: str, name: str) -> bool:
+    escaped = re.escape(name)
+    pattern = re.compile(
+        rf"(?:iszero\s*\(\s*{escaped}\s*\)"
+        rf"|(?<![A-Za-z0-9_]){escaped}(?![A-Za-z0-9_])\s*"
+        rf"(?:==|!=|>|<|>=|<=)\s*(?:0(?:x0+)?|1)\b"
+        rf"|\b(?:0(?:x0+)?|1)\s*(?:==|!=|>|<|>=|<=)\s*"
+        rf"(?<![A-Za-z0-9_]){escaped}(?![A-Za-z0-9_])"
+        rf"|\b(?:eq|lt|gt|slt|sgt)\s*\(\s*{escaped}\s*,"
+        rf"|\b(?:eq|lt|gt|slt|sgt)\s*\(\s*(?:0(?:x0+)?|1)\s*,\s*{escaped}\b)",
+        re.IGNORECASE,
+    )
+    return bool(pattern.search(text))
+
+
+def _callable_spans(lines: list[str]) -> list[tuple[int, int]]:
+    spans = [
+        (func.start_line, func.end_line)
+        for func in _iter_functions(lines, include_constructors=True)
+    ]
+    spans.extend((mod.start_line, mod.end_line) for mod in _iter_modifiers(lines))
+    return spans
+
+
+def _span_source(lines: list[str], start_line: int, end_line: int) -> str:
+    return "\n".join(
+        _without_line_comment(lines[index]) for index in range(start_line - 1, end_line)
+    )
+
+
+def _this_code_length_ranges(source: str) -> list[tuple[int, int]]:
+    return [(match.start(), match.end()) for match in THIS_CODE_LENGTH_PATTERN.finditer(source)]
+
+
+def _detect_extcodesize_eoa_check(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    # extcodesize == 0 (and address.code.length == 0) is a popular EOA gate.
+    # It is wrong during construction, when the caller has no code yet, and
+    # wrong for EIP-7702 delegated accounts, which are EOAs that do have code.
+    message = (
+        "extcodesize/code.length compared to zero is not a reliable EOA check "
+        "(constructors and EIP-7702)."
+    )
+    for start_line, end_line in _callable_spans(lines):
+        source = _span_source(lines, start_line, end_line)
+        this_ranges = _this_code_length_ranges(source)
+        for match in EXTCODESIZE_PATTERN.finditer(source):
+            close_end = _close_paren_end(source, match.end() - 1)
+            if close_end is None:
+                continue
+            args = source[match.end() : close_end - 1]
+            if _is_this_account(args):
+                continue
+            line_no = start_line + source[: match.start()].count("\n")
+            if ignore_next_lines and line_no in ignore_next_lines:
+                continue
+            name = _assigned_size_name(source, match.start(), close_end)
+            if not (
+                _compared_to_zeroish(source, match.start(), close_end)
+                or _yul_cmp_around_call(source, match.start())
+                or (name is not None and _name_tested_as_zero_size(source, name))
+            ):
+                continue
+            yield Finding(
+                file_path=file_path,
+                line_number=line_no,
+                code="A027",
+                severity="HIGH",
+                message=message,
+                line_text=lines[line_no - 1].rstrip(),
+            )
+        for match in CODE_LENGTH_PATTERN.finditer(source):
+            if any(start <= match.start() < end for start, end in this_ranges):
+                continue
+            expr_start = _receiver_start(source, match.start())
+            line_no = start_line + source[: match.start()].count("\n")
+            if ignore_next_lines and line_no in ignore_next_lines:
+                continue
+            name = _assigned_size_name(source, expr_start, match.end())
+            if not (
+                _compared_to_zeroish(source, expr_start, match.end())
+                or (name is not None and _name_tested_as_zero_size(source, name))
+            ):
+                continue
+            yield Finding(
+                file_path=file_path,
+                line_number=line_no,
+                code="A027",
+                severity="HIGH",
+                message=message,
+                line_text=lines[line_no - 1].rstrip(),
+            )
+
+
 def _detect_floating_pragma(
     lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
 ) -> Iterator[Finding]:
@@ -2094,6 +2350,7 @@ _DETECTORS = (
     _detect_encode_packed_collision,
     _detect_upgradeable_initializer,
     _detect_signature_replay,
+    _detect_extcodesize_eoa_check,
     _detect_floating_pragma,
 )
 

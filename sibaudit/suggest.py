@@ -249,6 +249,12 @@ _HINTS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
         "separator) into the signed digest, and consume the nonce on use.",
         (),
     ),
+    (
+        "A027",
+        "Do not treat a zero code size as proof of an EOA; constructors and "
+        "EIP-7702 accounts break that check. Authenticate the caller instead.",
+        (),
+    ),
 )
 
 
