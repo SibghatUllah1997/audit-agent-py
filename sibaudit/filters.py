@@ -70,3 +70,38 @@ def apply_filters(
             continue
         out.append(finding)
     return out
+
+
+FAIL_ON_ANY = "any"
+FAIL_ON_NEVER = "never"
+
+
+def parse_fail_on(value: str | None) -> str:
+    """Return ``any``, ``never``, or a canonical severity for ``--fail-on``.
+
+    Blank means ``any``: the exit code is non-zero whenever a finding is left.
+    """
+    if value is None or not value.strip():
+        return FAIL_ON_ANY
+    text = value.strip().lower()
+    if text in (FAIL_ON_ANY, FAIL_ON_NEVER):
+        return text
+    try:
+        return normalize_severity(text)
+    except ConfigError:
+        raise FilterError(
+            f"unknown --fail-on value {value!r}; use any, never, LOW, MEDIUM, or HIGH"
+        ) from None
+
+
+def should_fail(findings: Sequence[Finding], fail_on: str) -> bool:
+    """True when a reported finding meets the ``--fail-on`` policy.
+
+    Only the exit code is affected; every finding is still reported.
+    """
+    if fail_on == FAIL_ON_NEVER:
+        return False
+    if fail_on == FAIL_ON_ANY:
+        return bool(findings)
+    threshold = SEVERITY_RANK[fail_on]
+    return any(SEVERITY_RANK.get(f.severity, 0) >= threshold for f in findings)

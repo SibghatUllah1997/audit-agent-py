@@ -129,6 +129,20 @@ def test_extcodesize_and_layout_discovery_are_documented_and_days_40_41_are_done
     ) in roadmap
 
 
+def test_fail_on_and_html_report_are_documented_and_day_42_is_done() -> None:
+    readme = README.read_text(encoding="utf-8")
+    assert "--fail-on" in readme
+    assert "--html-report" in readme
+    assert "SIBAUDIT_FAIL_ON" in readme
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert "--fail-on" in changelog
+    assert "--html-report" in changelog
+    roadmap = ROADMAP.read_text(encoding="utf-8")
+    assert (
+        "- [x] Day 42: Add an HTML summary report and a `--fail-on` exit policy"
+    ) in roadmap
+
+
 def test_config_and_filters_are_documented_and_days_31_32_are_done() -> None:
     from sibaudit.config import load_config
 

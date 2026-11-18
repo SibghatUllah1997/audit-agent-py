@@ -182,6 +182,16 @@ python3 -m sibaudit --except A017,A010 path/to/contracts
 - Unknown codes or severities exit with code 2.
 - If the flags are omitted, `SIBAUDIT_MIN_SEVERITY`, `SIBAUDIT_ONLY`, and `SIBAUDIT_EXCEPT` are read instead. An explicit flag always wins.
 
+Exit policy and HTML report
+
+```bash
+python3 -m sibaudit --fail-on HIGH path/to/contracts
+python3 -m sibaudit --html-report sibaudit.html path/to/contracts
+```
+
+- By default the exit code is 1 when any finding is reported. `--fail-on LEVEL` exits 1 only when a reported finding is at `LEVEL` or above; `--fail-on never` always exits 0. Every finding is still printed. `SIBAUDIT_FAIL_ON` is read when the flag is omitted.
+- `--html-report FILE` also writes a single self-contained HTML page with counts by severity and by rule and a table of every finding, highest severity first. It has no scripts, no remote assets and no timestamp, so it can be kept as a CI artifact and diffed. Normal output still goes to stdout.
+
 Project layouts
 
 With no path arguments, sibaudit scans the current directory. If that directory is a Foundry project (`foundry.toml`) or a Hardhat project (`hardhat.config.js` / `.ts` and the other config suffixes), it walks `src/` and `contracts/` and skips `lib/`, `test/`, and `node_modules`. Foundry's `[profile.default] src` path is honored when set. Pass a file or folder explicitly to scan something else (`sibaudit test/`, `sibaudit lib/dep`). `--include` still searches the whole tree.
@@ -296,6 +306,7 @@ Use it as a GitHub Action
 - Annotations still show on the pull request when the step fails.
 - Scanning `.` picks up Foundry `src/` and Hardhat `contracts/` when those configs are present. Change the scan path for other layouts.
 - Set repository variables `SIBAUDIT_MIN_SEVERITY`, `SIBAUDIT_ONLY`, and `SIBAUDIT_EXCEPT` to apply the same filters as the CLI flags. Leave them unset for a full scan.
+- Set `SIBAUDIT_FAIL_ON` (for example `HIGH`) to keep annotations for every finding but fail the job only at that severity.
 
 Ignoring one line
 

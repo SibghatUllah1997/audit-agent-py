@@ -4,6 +4,9 @@
 - Added rule A027 to flag `extcodesize == 0` and `.code.length == 0` used as an EOA check, which breaks for constructors and EIP-7702 accounts.
 - When a Foundry or Hardhat directory is scanned, sibaudit now looks in `src/` and `contracts/` instead of walking lib, test, and node_modules.
 - Marked days 40 and 41 complete on the roadmap.
+- Added `--fail-on LEVEL` (or `never`) so the exit code can fail only on findings at or above a severity; `SIBAUDIT_FAIL_ON` works the same and the sample GitHub Action forwards it.
+- Added `--html-report FILE`, a self-contained HTML page with counts by severity and rule and every finding, highest severity first.
+- Marked day 42 complete on the roadmap.
 
 ## 2026-11-17
 - Added rule A024 to flag `abi.encodePacked` of two or more dynamic values (`string`, `bytes`, arrays), which can hash-collide; prefer `abi.encode`.
