@@ -31,7 +31,10 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "paths",
         nargs="*",
         default=["."],
-        help="Files or directories to scan (default: current directory).",
+        help=(
+            "Files or directories to scan (default: current directory). "
+            "A Foundry or Hardhat project directory is scanned via src/ and contracts/."
+        ),
     )
     parser.add_argument(
         "--format",

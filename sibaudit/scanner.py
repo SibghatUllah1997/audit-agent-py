@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import tomllib
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -306,6 +307,91 @@ class _ModifierInfo:
     header: str
 
 
+FOUNDRY_CONFIG_NAME = "foundry.toml"
+HARDHAT_CONFIG_NAMES = (
+    "hardhat.config.js",
+    "hardhat.config.ts",
+    "hardhat.config.cjs",
+    "hardhat.config.mjs",
+    "hardhat.config.mts",
+    "hardhat.config.cts",
+)
+DEFAULT_FOUNDRY_SRC = "src"
+HARDHAT_CONTRACTS_DIR = "contracts"
+
+
+def _has_solidity_files(directory: Path) -> bool:
+    return any(path.is_file() for path in directory.rglob("*.sol"))
+
+
+def _safe_project_child(directory: Path, rel: str) -> Path | None:
+    """Resolve ``rel`` under ``directory``, or None if it would escape the project."""
+    cleaned = rel.strip().replace("\\", "/").strip("/")
+    if not cleaned or ".." in Path(cleaned).parts:
+        return None
+    candidate = (directory / cleaned).resolve()
+    try:
+        candidate.relative_to(directory.resolve())
+    except ValueError:
+        return None
+    return candidate
+
+
+def _foundry_src_names(directory: Path) -> tuple[str, ...]:
+    path = directory / FOUNDRY_CONFIG_NAME
+    if not path.is_file():
+        return ()
+    names = [DEFAULT_FOUNDRY_SRC]
+    try:
+        data = tomllib.loads(path.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError):
+        return tuple(names)
+    profiles = data.get("profile")
+    if isinstance(profiles, dict):
+        default = profiles.get("default")
+        if isinstance(default, dict):
+            src = default.get("src")
+            if isinstance(src, str) and src.strip():
+                names = [src.strip()]
+    return tuple(names)
+
+
+def _has_hardhat_config(directory: Path) -> bool:
+    return any((directory / name).is_file() for name in HARDHAT_CONFIG_NAMES)
+
+
+def _layout_scan_roots(directory: Path) -> list[Path]:
+    """Foundry ``src/`` and Hardhat ``contracts/`` under a project root, if they have .sol files."""
+    names: list[str] = []
+    if (directory / FOUNDRY_CONFIG_NAME).is_file():
+        names.extend(_foundry_src_names(directory))
+        if HARDHAT_CONTRACTS_DIR not in names:
+            names.append(HARDHAT_CONTRACTS_DIR)
+    if _has_hardhat_config(directory) and HARDHAT_CONTRACTS_DIR not in names:
+        names.append(HARDHAT_CONTRACTS_DIR)
+    roots: list[Path] = []
+    seen: set[Path] = set()
+    for name in names:
+        child = _safe_project_child(directory, name)
+        if child is None or not child.is_dir() or not _has_solidity_files(child):
+            continue
+        resolved = child.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        roots.append(child)
+    return roots
+
+
+def _directory_scan_roots(directory: Path, *, honor_layouts: bool) -> list[Path]:
+    """Subtrees to walk for ``directory``. Layout dirs win when a project marker is present."""
+    if honor_layouts:
+        layouts = _layout_scan_roots(directory)
+        if layouts:
+            return layouts
+    return [directory]
+
+
 def _iter_solidity_files(
     paths: Iterable[Path],
     include: Sequence[str] | None = None,
@@ -317,9 +403,15 @@ def _iter_solidity_files(
             if is_selected(p.name, include, exclude):
                 yield p
         elif p.is_dir():
-            for sub in sorted(p.rglob("*.sol")):
-                if sub.is_file() and is_selected(sub.relative_to(p).as_posix(), include, exclude):
-                    yield sub
+            # An explicit --include glob is a request to pick files from the
+            # whole tree (for example test/*), so layout discovery stays off.
+            honor_layouts = not include
+            for root in _directory_scan_roots(p, honor_layouts=honor_layouts):
+                for sub in sorted(root.rglob("*.sol")):
+                    if sub.is_file() and is_selected(
+                        sub.relative_to(p).as_posix(), include, exclude
+                    ):
+                        yield sub
 
 
 def _without_line_comment(line: str) -> str:
