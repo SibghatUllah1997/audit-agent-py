@@ -931,6 +931,45 @@ RULES: tuple[Rule, ...] = (
             """
         ),
     ),
+    Rule(
+        code="A027",
+        severity="MEDIUM",
+        title="Code size used to tell an EOA from a contract",
+        rationale=(
+            "`extcodesize` and `address.code.length` are zero for an EOA, but also for a "
+            "contract whose constructor is still running, so an attacker contract can pass an "
+            "\"EOA only\" check by calling from its constructor. Since EIP-7702 a delegated "
+            "EOA carries code, so a \"no contracts\" check also locks out real users. Do not "
+            "base access or safety on account type; protect the logic itself with reentrancy "
+            "guards, per-account limits, or signatures. Checking that a target has code before "
+            "calling it is fine and is not flagged."
+        ),
+        flagged=_sol(
+            """
+            contract Drop {
+                mapping(address => uint256) public claimed;
+
+                function claim() external {
+                    require(msg.sender.code.length == 0, "no contracts");
+                    claimed[msg.sender] += 1;
+                }
+            }
+            """
+        ),
+        fixed=_sol(
+            """
+            contract Drop {
+                uint256 public constant LIMIT = 1;
+                mapping(address => uint256) public claimed;
+
+                function claim() external {
+                    require(claimed[msg.sender] < LIMIT, "limit");
+                    claimed[msg.sender] += 1;
+                }
+            }
+            """
+        ),
+    ),
 )
 
 _BY_CODE = {rule.code: rule for rule in RULES}

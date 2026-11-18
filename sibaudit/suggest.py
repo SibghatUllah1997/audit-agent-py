@@ -243,11 +243,24 @@ _HINTS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
                 "implementation cannot be initialized.",
             ),
         ),
-    ),    (
+    ),
+    (
         "A026",
         "Hash a per-signer nonce, a deadline and block.chainid (or an EIP-712 domain "
         "separator) into the signed digest, and consume the nonce on use.",
         (),
+    ),
+    (
+        "A027",
+        "Do not rely on code size to tell an EOA from a contract; guard the logic itself "
+        "with reentrancy locks, per-account limits or signatures.",
+        (
+            (
+                "EIP-7702",
+                "A constructor caller has no code yet and a delegated EOA has code, so drop "
+                "the account-type check and protect the logic itself.",
+            ),
+        ),
     ),
 )
 

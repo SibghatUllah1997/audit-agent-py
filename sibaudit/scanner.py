@@ -2032,6 +2032,126 @@ def _detect_signature_replay(
             )
 
 
+CALLER_SUBJECT_PATTERN = re.compile(
+    r"\bmsg\.sender\b|\btx\.origin\b|\b_msgSender\s*\(\s*\)|\bcaller\s*\(\s*\)|"
+    r"\borigin\s*\(\s*\)"
+)
+_CMP_OPS = r"==|!=|>=|<=|>|<"
+CODE_LENGTH_CMP_PATTERN = re.compile(
+    rf"(?P<subj>[\w.()\[\]]+?)\.code\.length\s*(?P<op>{_CMP_OPS})\s*(?P<num>\d+)\b"
+)
+CODE_LENGTH_CMP_REVERSED_PATTERN = re.compile(
+    rf"\b(?P<num>\d+)\s*(?P<op>{_CMP_OPS})\s*(?P<subj>[\w.()\[\]]+?)\.code\.length\b"
+)
+IS_CONTRACT_CALL_PATTERN = re.compile(
+    r"(?P<neg>!\s*)?(?P<recv>[\w.()]+\.)?\bisContract\s*\(\s*"
+    r"(?P<arg>[^()]*(?:\([^()]*\))?[^()]*)\)"
+)
+EXTCODESIZE_ISZERO_PATTERN = re.compile(r"\biszero\s*\(\s*extcodesize\s*\(")
+EXTCODESIZE_CALLER_PATTERN = re.compile(
+    r"\bextcodesize\s*\(\s*(?:caller|origin)\s*\(\s*\)\s*\)"
+)
+EXTCODESIZE_ASSIGN_PATTERN = re.compile(r"\b(?P<var>[A-Za-z_]\w*)\s*:=\s*extcodesize\s*\(")
+_FLIPPED_OPS = {"==": "==", "!=": "!=", ">": "<", "<": ">", ">=": "<=", "<=": ">="}
+
+_EOA_CHECK_MESSAGE = (
+    "Code size of zero used as an EOA check; it is also zero for a contract still in its "
+    "constructor, and an EIP-7702 delegated EOA has code."
+)
+_CALLER_CODE_MESSAGE = (
+    "Rejecting callers that have code is bypassable from a constructor and also blocks "
+    "EIP-7702 delegated EOAs."
+)
+
+
+def _code_size_meaning(op: str, num: int) -> str | None:
+    """Classify ``code size <op> num`` as "none" (no code), "some" (has code), or neither."""
+    if (op == "==" and num == 0) or (op == "<=" and num == 0) or (op == "<" and num == 1):
+        return "none"
+    if (op in ("!=", ">") and num == 0) or (op == ">=" and num == 1):
+        return "some"
+    return None
+
+
+def _size_var_means_no_code(lines: list[str], start: int, var: str) -> bool:
+    """True when ``var`` (an extcodesize result) is later compared against zero.
+
+    Looks from the assignment line to the end of the enclosing block.
+    """
+    name = re.escape(var)
+    zero_test = re.compile(
+        rf"\b{name}\s*==\s*0\b|\b0\s*==\s*{name}\b|\biszero\s*\(\s*{name}\s*\)|"
+        rf"\beq\s*\(\s*{name}\s*,\s*0\s*\)|\beq\s*\(\s*0\s*,\s*{name}\s*\)"
+    )
+    depth = 0
+    for index in range(start, len(lines)):
+        code = _without_line_comment(lines[index])
+        if zero_test.search(code):
+            return True
+        depth += code.count("{") - code.count("}")
+        if depth < 0:
+            return False
+    return False
+
+
+def _code_size_check_message(lines: list[str], index: int, code: str) -> str | None:
+    """Reason a line uses code size as an account-type check, if it does."""
+    for pattern, reversed_ in (
+        (CODE_LENGTH_CMP_PATTERN, False),
+        (CODE_LENGTH_CMP_REVERSED_PATTERN, True),
+    ):
+        for match in pattern.finditer(code):
+            op = _FLIPPED_OPS[match.group("op")] if reversed_ else match.group("op")
+            meaning = _code_size_meaning(op, int(match.group("num")))
+            if meaning == "none":
+                return _EOA_CHECK_MESSAGE
+            if meaning == "some" and CALLER_SUBJECT_PATTERN.search(match.group("subj")):
+                return _CALLER_CODE_MESSAGE
+    for match in IS_CONTRACT_CALL_PATTERN.finditer(code):
+        if re.search(r"\bfunction\s+$", code[: match.start()]):
+            continue
+        if match.group("neg"):
+            return _EOA_CHECK_MESSAGE
+        subject = f"{match.group('recv') or ''} {match.group('arg')}"
+        if CALLER_SUBJECT_PATTERN.search(subject):
+            return _CALLER_CODE_MESSAGE
+    if EXTCODESIZE_ISZERO_PATTERN.search(code):
+        return _EOA_CHECK_MESSAGE
+    if EXTCODESIZE_CALLER_PATTERN.search(code):
+        return _CALLER_CODE_MESSAGE
+    assign = EXTCODESIZE_ASSIGN_PATTERN.search(code)
+    if assign and _size_var_means_no_code(lines, index + 1, assign.group("var")):
+        return _EOA_CHECK_MESSAGE
+    return None
+
+
+def _detect_code_size_eoa_check(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    # extcodesize (or address.code.length) is zero for an EOA, but also for a
+    # contract whose constructor is still running, so "no code" does not prove
+    # a human signer. Since EIP-7702 a delegated EOA carries code, so "has
+    # code" does not prove a contract either. A target.code.length > 0 check
+    # before calling an address is fine and is left alone.
+    for idx, line in enumerate(lines, start=1):
+        if ignore_next_lines and idx in ignore_next_lines:
+            continue
+        code = _without_line_comment(line)
+        if not code.strip():
+            continue
+        message = _code_size_check_message(lines, idx - 1, code)
+        if message is None:
+            continue
+        yield Finding(
+            file_path=file_path,
+            line_number=idx,
+            code="A027",
+            severity="MEDIUM",
+            message=message,
+            line_text=line.rstrip(),
+        )
+
+
 def _detect_floating_pragma(
     lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
 ) -> Iterator[Finding]:
@@ -2094,6 +2214,7 @@ _DETECTORS = (
     _detect_encode_packed_collision,
     _detect_upgradeable_initializer,
     _detect_signature_replay,
+    _detect_code_size_eoa_check,
     _detect_floating_pragma,
 )
 
