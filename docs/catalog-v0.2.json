@@ -1,0 +1,61 @@
+{
+  "version": "0.2.0",
+  "rules": [
+    {
+      "code": "A021",
+      "severity": "HIGH",
+      "title": "`ecrecover` without a zero-address or identity check",
+      "rationale": "`ecrecover` returns `address(0)` when the signature is malformed. Using that value as a signer, or skipping a match against a known address, lets a bad signature pass as a valid one.",
+      "flagged": "// SPDX-License-Identifier: MIT\npragma solidity 0.8.20;\n\ncontract Permit {\n    mapping(address => uint256) public nonces;\n\n    function claim(bytes32 digest, uint8 v, bytes32 r, bytes32 s) external {\n        address signer = ecrecover(digest, v, r, s);\n        nonces[signer] += 1;\n    }\n}\n",
+      "fixed": "// SPDX-License-Identifier: MIT\npragma solidity 0.8.20;\n\ncontract Permit {\n    address public immutable issuer;\n\n    constructor(address who) {\n        require(who != address(0), \"zero\");\n        issuer = who;\n    }\n\n    function claim(bytes32 digest, uint8 v, bytes32 r, bytes32 s)\n        external\n        view\n        returns (bool)\n    {\n        address signer = ecrecover(digest, v, r, s);\n        require(signer != address(0), \"bad sig\");\n        return signer == issuer;\n    }\n}\n"
+    },
+    {
+      "code": "A022",
+      "severity": "MEDIUM",
+      "title": "Ether `transfer`/`send` (2300-gas stipend) used instead of `call`",
+      "rationale": "`address.transfer` and `address.send` forward only 2300 gas. A recipient that does more than log an event will fail, and the stipend is too small after gas-cost changes. Send value with `call` and check the success flag.",
+      "flagged": "// SPDX-License-Identifier: MIT\npragma solidity 0.8.20;\n\ncontract Wallet {\n    function pay(address payable to, uint256 amount) external {\n        to.transfer(amount);\n    }\n}\n",
+      "fixed": "// SPDX-License-Identifier: MIT\npragma solidity 0.8.20;\n\ncontract Wallet {\n    function pay(address payable to, uint256 amount) external {\n        (bool ok, ) = to.call{value: amount}(\"\");\n        require(ok, \"pay failed\");\n    }\n}\n"
+    },
+    {
+      "code": "A023",
+      "severity": "LOW",
+      "title": "Floating Solidity pragma (`^`, `~`, `>=`) in a deployable source",
+      "rationale": "A floating pragma lets every build pick a different compiler, so the bytecode you tested and audited may not be the bytecode you deploy. Pin one exact version in contracts and libraries. Tests, scripts, mocks and interface-only files are skipped.",
+      "flagged": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.20;\n\ncontract Vault {\n    uint256 public total;\n}\n",
+      "fixed": "// SPDX-License-Identifier: MIT\npragma solidity 0.8.20;\n\ncontract Vault {\n    uint256 public total;\n}\n"
+    },
+    {
+      "code": "A024",
+      "severity": "HIGH",
+      "title": "`abi.encodePacked` of dynamic types can collide",
+      "rationale": "`abi.encodePacked` concatenates values without a length prefix. Two dynamic values such as `string` or `bytes` can be split in more than one way and still hash to the same digest, so signatures, merkle leaves, and uniqueness checks built on that hash can be forged. Use `abi.encode`, which length-prefixes each value.",
+      "flagged": "// SPDX-License-Identifier: MIT\npragma solidity 0.8.20;\n\ncontract Merkle {\n    function leaf(string memory a, string memory b)\n        external\n        pure\n        returns (bytes32)\n    {\n        return keccak256(abi.encodePacked(a, b));\n    }\n}\n",
+      "fixed": "// SPDX-License-Identifier: MIT\npragma solidity 0.8.20;\n\ncontract Merkle {\n    function leaf(string memory a, string memory b)\n        external\n        pure\n        returns (bytes32)\n    {\n        return keccak256(abi.encode(a, b));\n    }\n}\n"
+    },
+    {
+      "code": "A025",
+      "severity": "HIGH",
+      "title": "Upgradeable initializer left public, or `_disableInitializers` missing",
+      "rationale": "A public `initialize` without the `initializer` lock can be called more than once and taken over. An implementation that never calls `_disableInitializers` in its constructor can also be initialized directly, which lets an attacker own the implementation and, on UUPS proxies, the proxy behind it. Lock the initializer and disable it in the constructor.",
+      "flagged": "// SPDX-License-Identifier: MIT\npragma solidity 0.8.20;\n\nabstract contract Initializable {\n    function _disableInitializers() internal {}\n}\n\ncontract Vault is Initializable {\n    address public owner;\n\n    function initialize(address owner_) public {\n        owner = owner_;\n    }\n}\n",
+      "fixed": "// SPDX-License-Identifier: MIT\npragma solidity 0.8.20;\n\nabstract contract Initializable {\n    uint64 private _initialized;\n\n    modifier initializer() {\n        require(_initialized == 0, \"init\");\n        _initialized = 1;\n        _;\n    }\n\n    function _disableInitializers() internal {\n        _initialized = type(uint64).max;\n    }\n}\n\ncontract Vault is Initializable {\n    address public owner;\n\n    constructor() {\n        _disableInitializers();\n    }\n\n    function initialize(address owner_) public initializer {\n        require(owner_ != address(0), \"zero\");\n        owner = owner_;\n    }\n}\n"
+    },
+    {
+      "code": "A026",
+      "severity": "HIGH",
+      "title": "Signature replay: signed data has no nonce, deadline, or chain id",
+      "rationale": "A signature stays valid for as long as the data it covers stays valid. If that data has no nonce the same signature can be submitted again, with no deadline it never expires, and with no chain id it can be replayed on a fork or another chain where the contract is deployed. Hash a per-signer nonce, a deadline, and `block.chainid` (or an EIP-712 domain separator) into the signed digest, and consume the nonce when the signature is used.",
+      "flagged": "// SPDX-License-Identifier: MIT\npragma solidity 0.8.20;\n\ncontract Voucher {\n    address public immutable issuer;\n    mapping(address => uint256) public credit;\n\n    constructor(address who) {\n        require(who != address(0), \"zero\");\n        issuer = who;\n    }\n\n    function redeem(uint256 amount, uint8 v, bytes32 r, bytes32 s) external {\n        bytes32 digest = keccak256(abi.encode(msg.sender, amount));\n        address signer = ecrecover(digest, v, r, s);\n        require(signer != address(0) && signer == issuer, \"bad sig\");\n        credit[msg.sender] += amount;\n    }\n}\n",
+      "fixed": "// SPDX-License-Identifier: MIT\npragma solidity 0.8.20;\n\ncontract Voucher {\n    address public immutable issuer;\n    mapping(address => uint256) public credit;\n    mapping(address => uint256) public nonces;\n\n    constructor(address who) {\n        require(who != address(0), \"zero\");\n        issuer = who;\n    }\n\n    function redeem(\n        uint256 amount,\n        uint256 deadline,\n        uint8 v,\n        bytes32 r,\n        bytes32 s\n    ) external {\n        // sibaudit:ignore-next-line\n        require(block.timestamp <= deadline, \"expired\");\n        uint256 nonce = nonces[msg.sender]++;\n        bytes32 digest = keccak256(\n            abi.encode(\n                block.chainid, address(this), msg.sender, amount, nonce, deadline\n            )\n        );\n        address signer = ecrecover(digest, v, r, s);\n        require(signer != address(0) && signer == issuer, \"bad sig\");\n        credit[msg.sender] += amount;\n    }\n}\n"
+    },
+    {
+      "code": "A027",
+      "severity": "HIGH",
+      "title": "`extcodesize == 0` used as an EOA check",
+      "rationale": "A zero code size does not mean the caller is an EOA. During construction a contract has no code yet, so `extcodesize` and `address.code.length` are zero and the check lets it in. EIP-7702 delegated accounts are EOAs that do have code, so the same check also rejects real users. Do not gate privileged actions on code size; authenticate the caller instead.",
+      "flagged": "// SPDX-License-Identifier: MIT\npragma solidity 0.8.20;\n\ncontract Gate {\n    function enter() external {\n        require(msg.sender.code.length == 0, \"no contracts\");\n    }\n}\n",
+      "fixed": "// SPDX-License-Identifier: MIT\npragma solidity 0.8.20;\n\ncontract Gate {\n    mapping(address => bool) public allowed;\n\n    function enter() external {\n        require(allowed[msg.sender], \"not allowed\");\n    }\n}\n"
+    }
+  ]
+}

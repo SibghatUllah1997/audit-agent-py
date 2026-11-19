@@ -11,7 +11,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "sibaudit"
-version = "0.1.0"
+version = "0.2.0"
 description = "Simple Solidity static analyzer for risky patterns (educational)."
 authors = [
   { name = "HM Sibghat Ullah", email = "h.m.sibghatullah1997@gmail.com" },
