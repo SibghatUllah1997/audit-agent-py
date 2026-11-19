@@ -24,6 +24,7 @@ from .filters import (
 )
 from .report import format_github_annotations, format_html, format_summary
 from .rules import format_explain, format_rule_list, get_rule
+from .sarif import format_sarif
 from .scanner import Finding, scan_paths
 from .suggest import (
     DEFAULT_LOCAL_URL,
@@ -52,11 +53,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument(
         "--format",
-        choices=["text", "json", "summary", "github"],
+        choices=["text", "json", "summary", "github", "sarif"],
         default="text",
         help=(
             "Output format: 'text' (default), 'json' (newline-delimited objects), "
-            "'summary', or 'github' (Actions workflow annotations)."
+            "'summary', 'github' (Actions workflow annotations), or 'sarif' "
+            "(SARIF 2.1.0 for code scanning upload)."
         ),
     )
     parser.add_argument(
@@ -343,6 +345,9 @@ def _print_findings(findings: list[Finding], fmt: str) -> None:
         text = format_github_annotations(findings)
         if text:
             print(text)
+        return
+    if fmt == "sarif":
+        sys.stdout.write(format_sarif(findings))
         return
     if fmt == "summary":
         print(format_summary(findings))

@@ -49,3 +49,4 @@ More rules and scanner UX, still one small shippable step per day. Keep the anal
 - [x] Day 42: Add an HTML summary report and a `--fail-on` exit policy (for example, fail only on high)
 - [x] Day 43: Add a baseline auto-update command that records current findings without hiding new ones later
 - [x] Day 44: Tag v0.2.0 and publish a rule catalog with examples for A021–A027
+- [x] Day 45: Add `--format sarif` (SARIF 2.1.0) with stable fingerprints and a code scanning upload example
