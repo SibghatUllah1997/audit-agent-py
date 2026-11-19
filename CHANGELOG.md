@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-19
+- Added `--update-baseline FILE` to refresh a known-issue snapshot: findings that moved stay suppressed, fixed ones are dropped, and new findings are not recorded so they still show up.
+- Snapshots now store the source line text so an update can follow a finding after edits; older files without `text` still load.
+- Published a v0.2.0 catalog of rules A021–A027 (markdown, JSON, and flagged/fixed Solidity examples) and marked days 43 and 44 complete on the roadmap.
+
 ## 2026-11-18
 - Added rule A027 to flag `extcodesize == 0` and `.code.length == 0` used as an EOA check, which breaks for constructors and EIP-7702 accounts.
 - When a Foundry or Hardhat directory is scanned, sibaudit now looks in `src/` and `contracts/` instead of walking lib, test, and node_modules.

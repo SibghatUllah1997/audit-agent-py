@@ -129,6 +129,25 @@ def test_extcodesize_and_layout_discovery_are_documented_and_days_40_41_are_done
     ) in roadmap
 
 
+def test_baseline_update_and_v0_2_catalog_are_documented_and_days_43_44_are_done() -> None:
+    readme = README.read_text(encoding="utf-8")
+    assert "--update-baseline" in readme
+    assert "docs/catalog-v0.2.md" in readme
+    assert "examples/catalog/" in readme
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert "## 2026-11-19" in changelog
+    assert "--update-baseline" in changelog
+    assert "A021" in changelog and "A027" in changelog
+    roadmap = ROADMAP.read_text(encoding="utf-8")
+    assert (
+        "- [x] Day 43: Add a baseline auto-update command that records current "
+        "findings without hiding new ones later"
+    ) in roadmap
+    assert (
+        "- [x] Day 44: Tag v0.2.0 and publish a rule catalog with examples for A021–A027"
+    ) in roadmap
+
+
 def test_fail_on_and_html_report_are_documented_and_day_42_is_done() -> None:
     readme = README.read_text(encoding="utf-8")
     assert "--fail-on" in readme

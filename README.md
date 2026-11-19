@@ -110,6 +110,8 @@ Rule explanations
 - `sibaudit --explain A008` prints why the rule matters plus a flagged and a fixed snippet.
 - The same text, for every rule, lives in [docs/RULES.md](docs/RULES.md). It is generated with
   `python -m sibaudit.rules > docs/RULES.md`, and tests scan each snippet so the examples stay honest.
+- v0.2.0 also ships a focused A021–A027 catalog: [docs/catalog-v0.2.md](docs/catalog-v0.2.md),
+  [docs/catalog-v0.2.json](docs/catalog-v0.2.json), and runnable copies in `examples/catalog/`.
 
 Local fix hints
 
@@ -219,10 +221,17 @@ python3 -m sibaudit path/to/contracts --write-baseline .sibaudit-baseline.json
 python3 -m sibaudit path/to/contracts --baseline .sibaudit-baseline.json
 ```
 
-- The file is JSON: `version` plus a `findings` list of `{file, line, code}`.
+When the contract changes, refresh the snapshot without swallowing new issues:
+
+```bash
+python3 -m sibaudit path/to/contracts --update-baseline .sibaudit-baseline.json
+```
+
+- The file is JSON: `version` plus a `findings` list of `{file, line, code, text}`. Older files without `text` still load.
 - Paths are stored relative to the current working directory.
-- `--write-baseline` records the full current scan, even when `--baseline` is also set.
-- A missing or invalid baseline file exits with code 2.
+- `--write-baseline` records the full current scan, even when `--baseline` is also set. Use it once to create the file.
+- `--update-baseline FILE` rewrites FILE in place: known findings stay (and follow the same source line if it moved), issues that are gone are dropped, and new findings are left unrecorded so they still fail the scan. It implies `--baseline FILE`.
+- A missing or invalid baseline file exits with code 2. Updating a missing file tells you to use `--write-baseline` first.
 
 Summary report
 
