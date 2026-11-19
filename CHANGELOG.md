@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-19 (day 45)
+- Added `--format sarif`, a SARIF 2.1.0 log with one rule entry per reported code, `error`/`warning`/`note` levels, and a `security-severity` score for GitHub code scanning.
+- Each result carries a fingerprint from path, rule, and normalized source line, so alerts survive line moves; repeated identical lines get distinct ids.
+- Added `examples/github/code-scanning.yml` to upload the log with `upload-sarif`. Marked day 45 complete on the roadmap.
+
 ## 2026-11-19
 - Added `--update-baseline FILE` to refresh a known-issue snapshot: findings that moved stay suppressed, fixed ones are dropped, and new findings are not recorded so they still show up.
 - Snapshots now store the source line text so an update can follow a finding after edits; older files without `text` still load.

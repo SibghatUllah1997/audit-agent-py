@@ -307,6 +307,18 @@ python3 -m sibaudit --format github path/to/contracts
 ::warning file=Token.sol,line=7,title=A001 (MEDIUM)::Potential risky use of tx.origin (often unsafe for auth).
 ```
 
+SARIF for code scanning
+
+`--format sarif` prints one SARIF 2.1.0 log for the whole scan, so findings can be uploaded to GitHub code scanning (or any SARIF viewer). HIGH maps to `error`, MEDIUM to `warning`, and LOW to `note`; each rule also carries a `security-severity` score.
+
+```bash
+python3 -m sibaudit --format sarif --fail-on never path/to/contracts > sibaudit.sarif
+```
+
+- Paths are relative to the current directory, so run it from the repository root.
+- Each result has a `primaryLocationLineHash` built from the path, rule code, and source line (not the line number), so an alert keeps its identity when code above it moves.
+- `examples/github/code-scanning.yml` scans and uploads the file with `github/codeql-action/upload-sarif`.
+
 Use it as a GitHub Action
 
 `examples/github/annotate.yml` is a ready-made workflow. Copy it to `.github/workflows/sibaudit.yml` in a Solidity project:
@@ -373,7 +385,7 @@ flowchart TD
     CFG -->|--min-severity --only --except| FLT[Filter findings]
     FLT -->|optional baseline file| G[Suppress known issues]
     G -->|optional --suggest catalog/cmd| I[Local fix hints]
-    I -->|--format text/json/summary/github| H[stdout + exit code]
+    I -->|--format text/json/summary/github/sarif| H[stdout + exit code]
 ```
 
 Roadmap

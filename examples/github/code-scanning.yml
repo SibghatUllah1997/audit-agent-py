@@ -1,0 +1,40 @@
+# Copy this file to .github/workflows/sibaudit-sarif.yml in a Solidity project.
+# Findings are uploaded as SARIF so they appear under Security > Code scanning
+# and stay tracked across pushes. The scan step never fails the job
+# (--fail-on never); use code scanning branch protection to gate merges.
+name: sibaudit code scanning
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install sibaudit
+        run: |
+          python -m pip install --upgrade pip
+          pip install sibaudit
+
+      - name: Scan Solidity files
+        run: python3 -m sibaudit --format sarif --fail-on never . > sibaudit.sarif
+
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: sibaudit.sarif
+          category: sibaudit
