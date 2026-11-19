@@ -6,13 +6,17 @@ from pathlib import Path
 import pytest
 
 from sibaudit.baseline import (
+    BaselineEntry,
     BaselineError,
     apply_baseline,
     dump_baseline,
     files_match,
+    format_update_summary,
     is_suppressed,
     load_baseline,
+    normalize_line_text,
     relative_file,
+    rematch_baseline,
     write_baseline,
 )
 from sibaudit.scanner import Finding
@@ -142,6 +146,112 @@ def test_apply_baseline_filters_matching_findings(tmp_path: Path) -> None:
 
     remaining = apply_baseline([known, other_line, other_code, other_file], entries, tmp_path)
     assert remaining == [other_line, other_code, other_file]
+
+
+def test_dump_stores_normalized_source_text(tmp_path: Path) -> None:
+    finding = _finding(tmp_path, "src/Token.sol", 10, "A001")
+    payload = json.loads(dump_baseline([finding], tmp_path))
+    assert payload["findings"][0]["text"] == normalize_line_text(finding.line_text)
+
+
+def test_load_accepts_snapshots_without_text(tmp_path: Path) -> None:
+    path = tmp_path / "old.json"
+    path.write_text(
+        json.dumps({"version": 1, "findings": [{"file": "A.sol", "line": 3, "code": "A001"}]})
+    )
+    entries = load_baseline(path)
+    assert entries[0].text == ""
+
+
+def test_load_rejects_non_string_text(tmp_path: Path) -> None:
+    path = tmp_path / "bad.json"
+    path.write_text(
+        json.dumps({"findings": [{"file": "A.sol", "line": 1, "code": "A001", "text": 9}]})
+    )
+    with pytest.raises(BaselineError, match="invalid source text"):
+        load_baseline(path)
+
+
+def test_rematch_keeps_exact_hits_and_drops_fixed(tmp_path: Path) -> None:
+    known = _finding(tmp_path, "src/Token.sol", 10, "A001")
+    gone = BaselineEntry(file="src/Token.sol", line=4, code="A003", text="selfdestruct(owner);")
+    matching = BaselineEntry(
+        file="src/Token.sol",
+        line=10,
+        code="A001",
+        text=normalize_line_text(known.line_text),
+    )
+    update = rematch_baseline([known], [matching, gone], tmp_path)
+    assert update.kept == (known,)
+    assert update.moved == ()
+    assert update.dropped == (gone,)
+    assert update.new == ()
+    assert update.recorded == (known,)
+
+
+def test_rematch_follows_source_text_after_line_inserts(tmp_path: Path) -> None:
+    old = _finding(tmp_path, "src/Token.sol", 5, "A001")
+    moved = _finding(tmp_path, "src/Token.sol", 12, "A001")
+    entry = BaselineEntry(
+        file="src/Token.sol",
+        line=5,
+        code="A001",
+        text=normalize_line_text(old.line_text),
+    )
+    update = rematch_baseline([moved], [entry], tmp_path)
+    assert update.kept == ()
+    assert update.moved == (moved,)
+    assert update.dropped == ()
+    assert update.new == ()
+
+
+def test_rematch_does_not_record_new_findings(tmp_path: Path) -> None:
+    known = _finding(tmp_path, "src/Token.sol", 10, "A001")
+    extra = _finding(tmp_path, "src/Token.sol", 18, "A002")
+    extra_same_rule = _finding(tmp_path, "src/Other.sol", 3, "A001")
+    entry = BaselineEntry(
+        file="src/Token.sol",
+        line=10,
+        code="A001",
+        text=normalize_line_text(known.line_text),
+    )
+    update = rematch_baseline([known, extra, extra_same_rule], [entry], tmp_path)
+    assert update.recorded == (known,)
+    assert extra in update.new
+    assert extra_same_rule in update.new
+
+
+def test_rematch_proximity_when_snapshot_has_no_text(tmp_path: Path) -> None:
+    current = _finding(tmp_path, "src/Token.sol", 14, "A001")
+    entry = BaselineEntry(file="src/Token.sol", line=10, code="A001")
+    update = rematch_baseline([current], [entry], tmp_path)
+    assert update.moved == (current,)
+    assert update.new == ()
+
+
+def test_rematch_does_not_follow_beyond_max_drift_without_text(tmp_path: Path) -> None:
+    current = _finding(tmp_path, "src/Token.sol", 80, "A001")
+    entry = BaselineEntry(file="src/Token.sol", line=10, code="A001")
+    update = rematch_baseline([current], [entry], tmp_path, max_line_drift=40)
+    assert update.moved == ()
+    assert update.dropped == (entry,)
+    assert update.new == (current,)
+
+
+def test_format_update_summary_singular_and_plural(tmp_path: Path) -> None:
+    known = _finding(tmp_path, "src/Token.sol", 10, "A001")
+    extra = _finding(tmp_path, "src/Token.sol", 18, "A002")
+    entry = BaselineEntry(
+        file="src/Token.sol",
+        line=10,
+        code="A001",
+        text=normalize_line_text(known.line_text),
+    )
+    one_new = rematch_baseline([known, extra], [entry], tmp_path)
+    assert "1 new finding left unsuppressed" in format_update_summary(one_new)
+    none_new = rematch_baseline([known], [entry], tmp_path)
+    assert "0 new findings left unsuppressed" in format_update_summary(none_new)
+    assert "kept 1" in format_update_summary(none_new)
 
 
 def test_tail_path_is_suppressed(tmp_path: Path) -> None:
