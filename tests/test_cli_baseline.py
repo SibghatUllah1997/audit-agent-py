@@ -89,6 +89,122 @@ def test_write_baseline_snapshots_current_findings(
     assert capsys.readouterr().out.strip() == ""
 
 
+def test_update_baseline_follows_moved_finding_and_leaves_new_out(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    src = tmp_path / "src"
+    src.mkdir()
+    sol = src / "Token.sol"
+    sol.write_text(RISKY)
+    first = tmp_path / "baseline.json"
+
+    with pytest.raises(SystemExit):
+        main([str(sol), "--write-baseline", str(first)])
+    capsys.readouterr()
+
+    extra = """
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
+contract C {
+    function f() external view returns (address) {
+        return tx.origin;
+    }
+    function g(address target) external {
+        target.call("");
+    }
+}
+""".strip()
+    sol.write_text(extra)
+
+    with pytest.raises(SystemExit) as shown:
+        main([str(sol), "--update-baseline", str(first)])
+    assert shown.value.code == 1
+    captured = capsys.readouterr()
+    assert "A002" in captured.out
+    assert "A001" not in captured.out
+    assert "moved" in captured.err
+    assert "new finding" in captured.err
+
+    payload = json.loads(first.read_text())
+    codes = {item["code"] for item in payload["findings"]}
+    assert codes == {"A001"}
+    assert all(item["line"] != 99 for item in payload["findings"])
+
+
+def test_update_baseline_exits_zero_when_only_known_remain(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    sol = tmp_path / "Token.sol"
+    sol.write_text(RISKY)
+    snap = tmp_path / "baseline.json"
+
+    with pytest.raises(SystemExit):
+        main([str(sol), "--write-baseline", str(snap)])
+    capsys.readouterr()
+
+    with pytest.raises(SystemExit) as second:
+        main([str(sol), "--update-baseline", str(snap)])
+    assert second.value.code == 0
+    captured = capsys.readouterr()
+    assert captured.out.strip() == ""
+    assert "0 new findings left unsuppressed" in captured.err
+    assert json.loads(snap.read_text())["findings"]
+
+
+def test_update_baseline_missing_file_exits_two(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    sol = tmp_path / "Token.sol"
+    sol.write_text(RISKY)
+    missing = tmp_path / "nope.json"
+    with pytest.raises(SystemExit) as failed:
+        main([str(sol), "--update-baseline", str(missing)])
+    assert failed.value.code == 2
+    err = capsys.readouterr().err
+    assert "not found" in err
+    assert "--write-baseline" in err
+
+
+def test_update_baseline_rejects_write_baseline(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    sol = tmp_path / "Token.sol"
+    sol.write_text(RISKY)
+    with pytest.raises(SystemExit) as failed:
+        main(
+            [
+                str(sol),
+                "--write-baseline",
+                str(tmp_path / "a.json"),
+                "--update-baseline",
+                str(tmp_path / "b.json"),
+            ]
+        )
+    assert failed.value.code == 2
+    assert "not both" in capsys.readouterr().err
+
+
+def test_update_baseline_rejects_a_different_baseline_file(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    sol = tmp_path / "Token.sol"
+    sol.write_text(RISKY)
+    with pytest.raises(SystemExit) as failed:
+        main(
+            [
+                str(sol),
+                "--baseline",
+                str(tmp_path / "old.json"),
+                "--update-baseline",
+                str(tmp_path / "new.json"),
+            ]
+        )
+    assert failed.value.code == 2
+    assert "same file" in capsys.readouterr().err
+
+
 def test_write_baseline_keeps_full_snapshot_when_filtering(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

@@ -5,7 +5,14 @@ import os
 import sys
 from pathlib import Path
 
-from .baseline import BaselineError, apply_baseline, load_baseline, write_baseline
+from .baseline import (
+    BaselineError,
+    apply_baseline,
+    format_update_summary,
+    load_baseline,
+    rematch_baseline,
+    write_baseline,
+)
 from .config import ConfigError, apply_config, find_and_load_config, load_config
 from .filters import (
     FilterError,
@@ -127,6 +134,16 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         help="Write a JSON snapshot of current findings (before --baseline filtering).",
     )
     parser.add_argument(
+        "--update-baseline",
+        metavar="FILE",
+        default=None,
+        help=(
+            "Refresh FILE in place: keep known findings (and follow them if they "
+            "moved), drop issues that are gone, and leave new findings unrecorded "
+            "so they still fail the scan. Implies --baseline FILE."
+        ),
+    )
+    parser.add_argument(
         "--explain",
         metavar="CODE",
         default=None,
@@ -221,15 +238,39 @@ def main(argv: list[str] | None = None) -> None:
         print(f"error: {exc}", file=sys.stderr)
         sys.exit(2)
     root = Path.cwd().resolve()
+    if ns.update_baseline and ns.write_baseline:
+        print("error: use --update-baseline or --write-baseline, not both", file=sys.stderr)
+        sys.exit(2)
+    if (
+        ns.update_baseline
+        and ns.baseline
+        and Path(ns.update_baseline).resolve() != Path(ns.baseline).resolve()
+    ):
+        print(
+            "error: --baseline and --update-baseline must name the same file",
+            file=sys.stderr,
+        )
+        sys.exit(2)
     entries = []
-    if ns.baseline:
+    baseline_path = Path(ns.update_baseline) if ns.update_baseline else (
+        Path(ns.baseline) if ns.baseline else None
+    )
+    if baseline_path is not None:
         try:
-            entries = load_baseline(Path(ns.baseline))
+            entries = load_baseline(baseline_path)
         except BaselineError as exc:
-            print(f"error: {exc}", file=sys.stderr)
+            hint = ""
+            if ns.update_baseline and "not found" in str(exc):
+                hint = "; use --write-baseline to create the first snapshot"
+            print(f"error: {exc}{hint}", file=sys.stderr)
             sys.exit(2)
     if ns.write_baseline:
         write_baseline(Path(ns.write_baseline), findings, root)
+    if ns.update_baseline:
+        update = rematch_baseline(findings, entries, root)
+        write_baseline(Path(ns.update_baseline), update.recorded, root)
+        print(format_update_summary(update), file=sys.stderr)
+        entries = load_baseline(Path(ns.update_baseline))
     if entries:
         findings = apply_baseline(findings, entries, root)
     if (ns.llm_model or ns.llm_url) and ns.suggest_backend != "local-llm":
