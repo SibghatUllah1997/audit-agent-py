@@ -216,6 +216,19 @@ python3 -m sibaudit contracts --include 'src/*' --exclude 'Mock*.sol' --exclude 
 - With no `--include`, every file is included. `--exclude` always wins.
 - A file passed directly is matched by its name only.
 
+Changed files only
+
+Scan just the Solidity files git says changed against a ref (including untracked `.sol` files):
+
+```bash
+python3 -m sibaudit --changed-since HEAD~1
+python3 -m sibaudit --changed-since origin/main src
+```
+
+- Path arguments still apply, so `src` ignores a changed file under `test/`.
+- Deleted files are skipped. A missing git repo or a bad ref exits with code 2. No changed files exits 0.
+- If the flag is omitted, `SIBAUDIT_CHANGED_SINCE` is read instead.
+
 Baseline suppression
 
 Snapshot today's findings, then hide them on later scans so only new issues show up:
