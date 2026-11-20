@@ -13,6 +13,7 @@ from .baseline import (
     rematch_baseline,
     write_baseline,
 )
+from .changed import ChangedError, filter_to_roots, list_changed_solidity
 from .config import ConfigError, apply_config, find_and_load_config, load_config
 from .filters import (
     FilterError,
@@ -74,6 +75,16 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         default=[],
         metavar="GLOB",
         help="Skip files matching this glob (repeatable); wins over --include.",
+    )
+    parser.add_argument(
+        "--changed-since",
+        metavar="REF",
+        default=None,
+        help=(
+            "Only scan Solidity files git reports as changed against REF "
+            "(for example HEAD~1 or origin/main). Untracked .sol files are included. "
+            "Path arguments still limit which of those files are scanned."
+        ),
     )
     parser.add_argument(
         "--config",
@@ -226,7 +237,12 @@ def main(argv: list[str] | None = None) -> None:
     except ConfigError as exc:
         print(f"error: {exc}", file=sys.stderr)
         sys.exit(2)
-    findings = scan_paths(ns.paths, include=ns.include, exclude=ns.exclude)
+    try:
+        scan_roots = _scan_targets(ns)
+    except ChangedError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        sys.exit(2)
+    findings = scan_paths(scan_roots, include=ns.include, exclude=ns.exclude)
     findings = apply_config(findings, config)
     try:
         findings = apply_filters(
@@ -313,6 +329,16 @@ def main(argv: list[str] | None = None) -> None:
             print(f"error: cannot write HTML report: {exc}", file=sys.stderr)
             sys.exit(2)
     sys.exit(1 if should_fail(findings, fail_on) else 0)
+
+
+def _scan_targets(ns: argparse.Namespace) -> list[str]:
+    """Paths to scan, optionally narrowed to files git reports as changed."""
+    ref = ns.changed_since or os.environ.get("SIBAUDIT_CHANGED_SINCE")
+    if ref is None or not str(ref).strip():
+        return list(ns.paths)
+    changed = list_changed_solidity(str(ref), Path.cwd())
+    roots = [Path(p) for p in ns.paths]
+    return [str(path) for path in filter_to_roots(changed, roots)]
 
 
 def _flag_or_env(flag_values: list[str], env_name: str) -> list[str]:
