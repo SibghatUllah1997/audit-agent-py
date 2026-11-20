@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-20
+- Added rule A029 to flag a `for`/`while` that walks a storage array's `.length` in a state-changing function, which can run out of gas as the list grows. A batch cap or cursor is enough to stay quiet.
+- Added `--changed-since REF` (and `SIBAUDIT_CHANGED_SINCE`) so a scan only looks at Solidity files git reports as changed against that ref, including untracked files.
+- Marked days 47 and 48 complete on the roadmap.
+
 ## 2026-11-20 (day 46)
 - Added rule A028 to flag ERC-20 `transfer`, `transferFrom`, and `approve` calls used as bare statements, so a token that returns `false` instead of reverting cannot fail silently.
 - Only receivers typed as an ERC-20 (`IERC20`, `ERC20`, `IERC20Metadata`, ...) or cast with `IERC20(addr)` count, which keeps ether `transfer` (A022) and ERC-721 `transferFrom` out of it.

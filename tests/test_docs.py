@@ -222,3 +222,23 @@ def test_erc20_return_rule_is_documented_and_day_46_is_done() -> None:
         "- [x] Day 46: Add rule A028: ERC-20 `transfer` / `transferFrom` / `approve` "
         "return value ignored (no SafeERC20 or check)"
     ) in roadmap
+
+
+def test_unbounded_loop_and_changed_since_are_documented_and_days_47_48_are_done() -> None:
+    text = README.read_text(encoding="utf-8")
+    assert "| A029 | HIGH" in text
+    assert "--changed-since" in text
+    assert "SIBAUDIT_CHANGED_SINCE" in text
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert "## 2026-11-20" in changelog
+    assert "A029" in changelog
+    assert "--changed-since" in changelog
+    roadmap = ROADMAP.read_text(encoding="utf-8")
+    assert (
+        "- [x] Day 47: Add rule A029: loop over an unbounded storage array in a "
+        "state-changing function (gas DoS)"
+    ) in roadmap
+    assert (
+        "- [x] Day 48: Add `--changed-since REF` to scan only Solidity files "
+        "changed against a git ref"
+    ) in roadmap
