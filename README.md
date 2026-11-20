@@ -96,6 +96,7 @@ Example output (real):
 /workspace/examples/Vulnerable.sol:161: A025 Upgradeable contract "OpenVault" has no constructor calling _disableInitializers().
 /workspace/examples/Vulnerable.sol:183: A026 Signature checked in "redeem" can be replayed; the signed data has no nonce, deadline, chain id.
 /workspace/examples/Vulnerable.sol:193: A027 extcodesize/code.length compared to zero is not a reliable EOA check (constructors and EIP-7702).
+/workspace/examples/Vulnerable.sol:207: A028 ERC-20 transfer() return value is ignored; some tokens return false instead of reverting. Use SafeERC20 or check the result.
 ```
 
 Notes

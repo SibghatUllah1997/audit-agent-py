@@ -55,7 +55,7 @@ More rules and scanner UX, still one small shippable step per day. Keep the anal
 
 Token-handling rules and CI-facing output. Same pace: one shippable step per day, heuristic and dependency-free.
 
-- [ ] Day 46: Add rule A028: ERC-20 `transfer` / `transferFrom` / `approve` return value ignored (no SafeERC20 or check)
+- [x] Day 46: Add rule A028: ERC-20 `transfer` / `transferFrom` / `approve` return value ignored (no SafeERC20 or check)
 - [ ] Day 47: Add rule A029: loop over an unbounded storage array in a state-changing function (gas DoS)
 - [ ] Day 48: Add `--changed-since REF` to scan only Solidity files changed against a git ref
 - [ ] Day 49: Add `--format markdown` for PR comments and `$GITHUB_STEP_SUMMARY`, grouped by severity

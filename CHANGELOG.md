@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-20 (day 46)
+- Added rule A028 to flag ERC-20 `transfer`, `transferFrom`, and `approve` calls used as bare statements, so a token that returns `false` instead of reverting cannot fail silently.
+- Only receivers typed as an ERC-20 (`IERC20`, `ERC20`, `IERC20Metadata`, ...) or cast with `IERC20(addr)` count, which keeps ether `transfer` (A022) and ERC-721 `transferFrom` out of it.
+- Planned phase 3 on the roadmap (days 46-49) and marked day 46 complete.
+
 ## 2026-11-19 (day 45)
 - Added `--format sarif`, a SARIF 2.1.0 log with one rule entry per reported code, `error`/`warning`/`note` levels, and a `security-severity` score for GitHub code scanning.
 - Each result carries a fingerprint from path, rule, and normalized source line, so alerts survive line moves; repeated identical lines get distinct ids.

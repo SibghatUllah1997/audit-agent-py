@@ -112,3 +112,11 @@ def test_sample_contract_flags_extcodesize_eoa_check() -> None:
     assert "code.length" in eoa[0].line_text
     assert "EOA" in eoa[0].message
     assert eoa[0].severity == "HIGH"
+
+
+def test_sample_contract_flags_unchecked_erc20_return() -> None:
+    findings = scan_paths([str(EXAMPLES)])
+    dropped = [f for f in findings if f.code == "A028"]
+    assert len(dropped) == 1
+    assert "token.transfer(to, amount)" in dropped[0].line_text
+    assert dropped[0].severity == "MEDIUM"
