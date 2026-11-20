@@ -255,6 +255,12 @@ _HINTS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
         "EIP-7702 accounts break that check. Authenticate the caller instead.",
         (),
     ),
+    (
+        "A028",
+        "Wrap the token call in require(...) or use SafeERC20 (safeTransfer, "
+        "safeTransferFrom, forceApprove) so a false return cannot pass silently.",
+        (),
+    ),
 )
 
 

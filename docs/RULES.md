@@ -1043,3 +1043,47 @@ contract Gate {
     }
 }
 ```
+
+## A028: ERC-20 `transfer`/`transferFrom`/`approve` return value ignored
+
+Severity: **MEDIUM**
+
+The ERC-20 standard has `transfer`, `transferFrom`, and `approve` return a bool, and some widely used tokens return `false` on failure instead of reverting. When the call is a bare statement the failure is silent: the contract books a payment or deposit that never happened. Wrap the call in `require`, or use a SafeERC20-style helper that also handles tokens which return nothing.
+
+Flagged:
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
+
+interface IERC20 {
+    function transfer(address to, uint256 amount) external returns (bool);
+}
+
+contract Payout {
+    IERC20 public token;
+
+    function pay(address to, uint256 amount) external {
+        token.transfer(to, amount);
+    }
+}
+```
+
+Fixed:
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
+
+interface IERC20 {
+    function transfer(address to, uint256 amount) external returns (bool);
+}
+
+contract Payout {
+    IERC20 public token;
+
+    function pay(address to, uint256 amount) external {
+        require(token.transfer(to, amount), "transfer failed");
+    }
+}
+```

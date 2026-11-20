@@ -2380,6 +2380,76 @@ def _detect_extcodesize_eoa_check(
             )
 
 
+ERC20_TYPE = r"I?ERC20\w*"
+ERC20_TYPED_NAME_PATTERN = re.compile(
+    rf"\b{ERC20_TYPE}(?:\s+(?:public|private|internal|immutable|constant|memory|calldata|storage))*"
+    r"\s+(?P<name>[A-Za-z_]\w*)\s*(?=[,;)=])"
+)
+ERC20_CAST_PATTERN = re.compile(rf"^{ERC20_TYPE}\s*\(")
+ERC20_CALL_PATTERN = re.compile(r"\.\s*(?P<method>transferFrom|transfer|approve)\s*\(")
+ERC20_ARG_COUNTS = {"transfer": 2, "transferFrom": 3, "approve": 2}
+
+
+def _erc20_names(lines: list[str]) -> set[str]:
+    """Names declared with an ERC-20 type (IERC20, ERC20, IERC20Metadata, ...)."""
+    text = _comment_stripped_source(lines)
+    return {match.group("name") for match in ERC20_TYPED_NAME_PATTERN.finditer(text)}
+
+
+def _is_erc20_receiver(receiver: str, token_names: set[str]) -> bool:
+    receiver = receiver.strip()
+    return receiver in token_names or bool(ERC20_CAST_PATTERN.match(receiver))
+
+
+def _is_bare_statement(source: str, start: int, close_end: int) -> bool:
+    """True when ``source[start:close_end]`` is a whole expression statement."""
+    before = _skip_ws_left(source, start)
+    if before > 0 and source[before - 1] not in ";{}":
+        return False
+    rest = source[close_end:].lstrip()
+    return rest.startswith(";")
+
+
+def _detect_unchecked_erc20_return(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    # ERC-20 transfer/transferFrom/approve return a bool. Several real tokens
+    # return false on failure instead of reverting, so a call used as a bare
+    # statement can fail silently. Only receivers typed as an ERC-20 (or cast
+    # with IERC20(...)) count, so ERC-721 transferFrom and ether transfer are
+    # left alone.
+    token_names = _erc20_names(lines)
+    for start_line, end_line in _callable_spans(lines):
+        source = _span_source(lines, start_line, end_line)
+        for match in ERC20_CALL_PATTERN.finditer(source):
+            method = match.group("method")
+            close_end = _close_paren_end(source, match.end() - 1)
+            if close_end is None:
+                continue
+            args = _split_top_level_args(source[match.end() : close_end - 1])
+            if len(args) != ERC20_ARG_COUNTS[method]:
+                continue
+            receiver_start = _receiver_start(source, match.start())
+            if not _is_erc20_receiver(source[receiver_start : match.start()], token_names):
+                continue
+            if not _is_bare_statement(source, receiver_start, close_end):
+                continue
+            line_no = start_line + source[: match.start()].count("\n")
+            if ignore_next_lines and line_no in ignore_next_lines:
+                continue
+            yield Finding(
+                file_path=file_path,
+                line_number=line_no,
+                code="A028",
+                severity="MEDIUM",
+                message=(
+                    f"ERC-20 {method}() return value is ignored; some tokens return false "
+                    "instead of reverting. Use SafeERC20 or check the result."
+                ),
+                line_text=lines[line_no - 1].rstrip(),
+            )
+
+
 def _detect_floating_pragma(
     lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
 ) -> Iterator[Finding]:
@@ -2444,6 +2514,7 @@ _DETECTORS = (
     _detect_signature_replay,
     _detect_extcodesize_eoa_check,
     _detect_floating_pragma,
+    _detect_unchecked_erc20_return,
 )
 
 
