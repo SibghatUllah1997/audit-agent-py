@@ -193,3 +193,17 @@ contract EoaGate {
         require(msg.sender.code.length == 0, "no contracts");
     }
 }
+
+// Some tokens return false instead of reverting, so a dropped result hides failures.
+interface IERC20 {
+    function transfer(address to, uint256 amount) external returns (bool);
+}
+
+contract TokenPayout {
+    IERC20 public token;
+
+    function pay(address to, uint256 amount) external {
+        // A028
+        token.transfer(to, amount);
+    }
+}

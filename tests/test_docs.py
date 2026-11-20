@@ -209,3 +209,16 @@ def test_suggest_is_documented_and_days_one_and_thirty_are_done() -> None:
     roadmap = ROADMAP.read_text(encoding="utf-8")
     assert "- [x] Day 1: Minimal CLI + 2 rules (tx.origin, unchecked call)" in roadmap
     assert "- [x] Day 30: Optional LLM-assisted suggestions (offline/local first)" in roadmap
+
+
+def test_erc20_return_rule_is_documented_and_day_46_is_done() -> None:
+    assert "| A028 | MEDIUM" in README.read_text(encoding="utf-8")
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert "## 2026-11-20 (day 46)" in changelog
+    assert "A028" in changelog
+    roadmap = ROADMAP.read_text(encoding="utf-8")
+    assert "# Phase 3" in roadmap
+    assert (
+        "- [x] Day 46: Add rule A028: ERC-20 `transfer` / `transferFrom` / `approve` "
+        "return value ignored (no SafeERC20 or check)"
+    ) in roadmap

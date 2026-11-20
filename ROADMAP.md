@@ -50,3 +50,12 @@ More rules and scanner UX, still one small shippable step per day. Keep the anal
 - [x] Day 43: Add a baseline auto-update command that records current findings without hiding new ones later
 - [x] Day 44: Tag v0.2.0 and publish a rule catalog with examples for A021–A027
 - [x] Day 45: Add `--format sarif` (SARIF 2.1.0) with stable fingerprints and a code scanning upload example
+
+# Phase 3
+
+Token-handling rules and CI-facing output. Same pace: one shippable step per day, heuristic and dependency-free.
+
+- [x] Day 46: Add rule A028: ERC-20 `transfer` / `transferFrom` / `approve` return value ignored (no SafeERC20 or check)
+- [ ] Day 47: Add rule A029: loop over an unbounded storage array in a state-changing function (gas DoS)
+- [ ] Day 48: Add `--changed-since REF` to scan only Solidity files changed against a git ref
+- [ ] Day 49: Add `--format markdown` for PR comments and `$GITHUB_STEP_SUMMARY`, grouped by severity
