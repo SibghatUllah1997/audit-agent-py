@@ -207,3 +207,21 @@ contract TokenPayout {
         token.transfer(to, amount);
     }
 }
+
+// Looping a storage array in one transaction can run out of gas as the list grows.
+contract Airdrop {
+    address[] public recipients;
+    mapping(address => uint256) public credit;
+
+    function add(address who) external {
+        require(who != address(0), "zero");
+        recipients.push(who);
+    }
+
+    function payout() external {
+        // A029
+        for (uint256 i = 0; i < recipients.length; i++) {
+            credit[recipients[i]] += 1;
+        }
+    }
+}
