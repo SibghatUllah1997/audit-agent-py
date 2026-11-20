@@ -1016,6 +1016,63 @@ RULES: tuple[Rule, ...] = (
             """
         ),
     ),
+    Rule(
+        code="A029",
+        severity="HIGH",
+        title="Unbounded loop over a storage array in a state-changing function",
+        rationale=(
+            "A `for` or `while` whose bound is a storage array's `.length` costs more gas "
+            "every time someone `push`es. Once the list is long enough the transaction "
+            "runs out of gas and the function can no longer be called, so payouts, "
+            "sweeps, or clean-up get stuck. Cap the number of iterations per call and "
+            "keep a cursor, or move the work off-chain."
+        ),
+        flagged=_sol(
+            """
+            contract Airdrop {
+                address[] public recipients;
+                mapping(address => uint256) public credit;
+
+                function add(address who) external {
+                    require(who != address(0), "zero");
+                    recipients.push(who);
+                }
+
+                function payout() external {
+                    for (uint256 i = 0; i < recipients.length; i++) {
+                        credit[recipients[i]] += 1;
+                    }
+                }
+            }
+            """
+        ),
+        fixed=_sol(
+            """
+            contract Airdrop {
+                address[] public recipients;
+                mapping(address => uint256) public credit;
+                uint256 public constant BATCH = 50;
+                uint256 public cursor;
+
+                function add(address who) external {
+                    require(who != address(0), "zero");
+                    recipients.push(who);
+                }
+
+                function payout() external {
+                    uint256 end = cursor + BATCH;
+                    if (end > recipients.length) {
+                        end = recipients.length;
+                    }
+                    for (uint256 i = cursor; i < end; i++) {
+                        credit[recipients[i]] += 1;
+                    }
+                    cursor = end;
+                }
+            }
+            """
+        ),
+    ),
 )
 
 _BY_CODE = {rule.code: rule for rule in RULES}

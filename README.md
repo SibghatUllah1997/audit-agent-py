@@ -41,6 +41,7 @@ Rules
 | A026 | HIGH     | Signature replay: signed data has no nonce, deadline, or chain id |
 | A027 | HIGH     | `extcodesize` / `.code.length == 0` used as an EOA check |
 | A028 | MEDIUM   | ERC-20 `transfer`/`transferFrom`/`approve` result ignored |
+| A029 | HIGH     | Unbounded loop over a storage array in a state-changing function |
 
 Install
 - Python 3.11+

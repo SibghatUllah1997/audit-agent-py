@@ -2450,6 +2450,153 @@ def _detect_unchecked_erc20_return(
             )
 
 
+DYNAMIC_ARRAY_STATE_PATTERN = re.compile(
+    r"\b(?:address|bool|string|bytes(?:[1-9]|[12]\d|3[0-2])?|bytes|u?int(?:\d+)?|[A-Z]\w*)"
+    r"(?:\s+payable)?"
+    r"(?:\s+(?:public|private|internal))*"
+    r"\s*\[\s*\]"
+    r"(?:\s+(?:public|private|internal))*"
+    r"\s+(?P<name>[A-Za-z_]\w*)"
+    r"\s*;",
+    re.IGNORECASE,
+)
+MAPPING_TO_ARRAY_STATE_PATTERN = re.compile(
+    r"\bmapping\s*\([^;]*?=>\s*"
+    r"(?:address|bool|string|bytes(?:[1-9]|[12]\d|3[0-2])?|bytes|u?int(?:\d+)?|[A-Z]\w*)"
+    r"(?:\s+payable)?"
+    r"\s*\[\s*\]\s*\)"
+    r"(?:\s+(?:public|private|internal))*"
+    r"\s+(?P<name>[A-Za-z_]\w*)"
+    r"\s*;",
+    re.IGNORECASE | re.DOTALL,
+)
+LOOP_CAP_NAME_PATTERN = re.compile(
+    r"\b(?:MAX|LIMIT|CAP|BOUND|BATCH|PAGE|CHUNK|PAGE_SIZE)\w*\b",
+    re.IGNORECASE,
+)
+LOOP_CAP_CALL_PATTERN = re.compile(r"\b(?:min|Math\.min)\s*\(", re.IGNORECASE)
+NONTRIVIAL_INT_PATTERN = re.compile(r"(?<![A-Za-z0-9_.])[2-9]\d*(?![A-Za-z0-9_])")
+LENGTH_ACCESS_FMT = (
+    r"(?<![A-Za-z0-9_]){name}(?![A-Za-z0-9_])"
+    r"(?:\s*\[[^\]]*\])?"
+    r"\s*\.\s*length\b"
+)
+
+
+def _storage_array_names(lines: list[str]) -> set[str]:
+    """State variable names that are dynamic arrays (or mappings onto arrays)."""
+    names: set[str] = set()
+    for raw in _state_level_lines(lines):
+        lowered = raw.lower()
+        if any(token in lowered for token in ("function", "event", "error", "modifier", "using")):
+            continue
+        if re.search(r"\b(?:memory|calldata|storage)\b", raw):
+            continue
+        for match in DYNAMIC_ARRAY_STATE_PATTERN.finditer(raw):
+            names.add(match.group("name"))
+        for match in MAPPING_TO_ARRAY_STATE_PATTERN.finditer(raw):
+            names.add(match.group("name"))
+    return names
+
+
+def _split_top_level(text: str, sep: str) -> list[str]:
+    """Split ``text`` on ``sep`` that is not inside nested ``()[]{}``."""
+    parts: list[str] = []
+    depth = 0
+    current: list[str] = []
+    for char in text:
+        if char in "([{":
+            depth += 1
+            current.append(char)
+        elif char in ")]}":
+            depth -= 1
+            current.append(char)
+        elif char == sep and depth == 0:
+            parts.append("".join(current))
+            current = []
+        else:
+            current.append(char)
+    parts.append("".join(current))
+    return parts
+
+
+def _iter_loop_headers(source: str) -> Iterator[tuple[int, str, str]]:
+    """Yield ``(start, kind, inside_parens)`` for each ``for`` / ``while``."""
+    for kind in ("for", "while"):
+        for match in re.finditer(rf"\b{kind}\s*\(", source):
+            inner = _extract_paren_args(source, match.end() - 1)
+            if inner is None:
+                continue
+            yield match.start(), kind, inner
+
+
+def _loop_condition(kind: str, inner: str) -> str:
+    if kind == "while":
+        return inner
+    parts = _split_top_level(inner, ";")
+    if len(parts) >= 2:
+        return parts[1]
+    return inner
+
+
+def _loop_bound_text(kind: str, inner: str) -> str:
+    """Text that can mention ``.length`` as a loop bound (header or condition)."""
+    if kind == "while":
+        return inner
+    return inner
+
+
+def _storage_length_in(text: str, array_names: set[str]) -> str | None:
+    for name in sorted(array_names, key=len, reverse=True):
+        if re.search(LENGTH_ACCESS_FMT.format(name=re.escape(name)), text):
+            return name
+    return None
+
+
+def _loop_condition_has_cap(cond: str) -> bool:
+    """True if the condition also limits iterations (a max, min(), or batch size)."""
+    if LOOP_CAP_NAME_PATTERN.search(cond) or LOOP_CAP_CALL_PATTERN.search(cond):
+        return True
+    return bool(("&&" in cond or "||" in cond) and NONTRIVIAL_INT_PATTERN.search(cond))
+
+
+def _detect_unbounded_storage_loop(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    # A for/while whose bound is a storage array's .length grows with every
+    # push. Past a point the transaction runs out of gas and the function
+    # cannot be called. View/pure reads are skipped; a cap in the condition
+    # (MAX, min(), or `&& i < 50`) is treated as a batch.
+    array_names = _storage_array_names(lines)
+    if not array_names:
+        return
+    for func in _iter_functions(lines, include_constructors=True):
+        if func.is_view_or_pure:
+            continue
+        source = _function_source(lines, func)
+        for start, kind, inner in _iter_loop_headers(source):
+            bound = _loop_bound_text(kind, inner)
+            name = _storage_length_in(bound, array_names)
+            if name is None:
+                continue
+            if _loop_condition_has_cap(_loop_condition(kind, inner)):
+                continue
+            line_no = func.start_line + source[:start].count("\n")
+            if ignore_next_lines and line_no in ignore_next_lines:
+                continue
+            yield Finding(
+                file_path=file_path,
+                line_number=line_no,
+                code="A029",
+                severity="HIGH",
+                message=(
+                    f'Unbounded loop over storage array "{name}" in a state-changing '
+                    "function; a long list can run out of gas."
+                ),
+                line_text=lines[line_no - 1].rstrip(),
+            )
+
+
 def _detect_floating_pragma(
     lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
 ) -> Iterator[Finding]:
@@ -2515,6 +2662,7 @@ _DETECTORS = (
     _detect_extcodesize_eoa_check,
     _detect_floating_pragma,
     _detect_unchecked_erc20_return,
+    _detect_unbounded_storage_loop,
 )
 
 

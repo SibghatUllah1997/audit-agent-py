@@ -261,6 +261,12 @@ _HINTS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
         "safeTransferFrom, forceApprove) so a false return cannot pass silently.",
         (),
     ),
+    (
+        "A029",
+        "Cap iterations per call (a BATCH constant and a cursor) instead of looping "
+        "the whole storage array in one transaction.",
+        (),
+    ),
 )
 
 
