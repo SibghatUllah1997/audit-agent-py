@@ -336,6 +336,18 @@ python3 -m sibaudit --format sarif --fail-on never path/to/contracts > sibaudit.
 - Each result has a `primaryLocationLineHash` built from the path, rule code, and source line (not the line number), so an alert keeps its identity when code above it moves.
 - `examples/github/code-scanning.yml` scans and uploads the file with `github/codeql-action/upload-sarif`.
 
+Markdown for PR comments and job summaries
+
+`--format markdown` prints a GitHub-flavored report: a total, a table of counts per rule, then one table per severity (HIGH first). There is no timestamp, so the same scan gives the same text.
+
+```bash
+python3 -m sibaudit --format markdown --fail-on high . >> "$GITHUB_STEP_SUMMARY"
+```
+
+- Paths are relative to the current directory. Source lines are escaped so a `|` or `<` in code cannot break the table.
+- Only the first 200 findings get a row, which keeps the report under GitHub's comment size limit. Counts always cover everything; use `--format json` for the full list.
+- `examples/github/job-summary.yml` writes the report to the run's summary page. Post the same output with `gh pr comment --body-file` if you want it on the PR.
+
 Use it as a GitHub Action
 
 `examples/github/annotate.yml` is a ready-made workflow. Copy it to `.github/workflows/sibaudit.yml` in a Solidity project:
@@ -402,7 +414,7 @@ flowchart TD
     CFG -->|--min-severity --only --except| FLT[Filter findings]
     FLT -->|optional baseline file| G[Suppress known issues]
     G -->|optional --suggest catalog/cmd| I[Local fix hints]
-    I -->|--format text/json/summary/github/sarif| H[stdout + exit code]
+    I -->|--format text/json/summary/github/sarif/markdown| H[stdout + exit code]
 ```
 
 Roadmap

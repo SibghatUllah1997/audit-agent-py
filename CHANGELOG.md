@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-21
+- Added `--format markdown`: a total, counts per rule, and one findings table per severity, ready for a PR comment or `$GITHUB_STEP_SUMMARY`.
+- Source text is escaped so it cannot break a table, and rows stop at 200 to stay under GitHub's comment limit while counts stay exact.
+- Added `examples/github/job-summary.yml` and marked day 49 complete on the roadmap.
+
 ## 2026-11-20
 - Added rule A029 to flag a `for`/`while` that walks a storage array's `.length` in a state-changing function, which can run out of gas as the list grows. A batch cap or cursor is enough to stay quiet.
 - Added `--changed-since REF` (and `SIBAUDIT_CHANGED_SINCE`) so a scan only looks at Solidity files git reports as changed against that ref, including untracked files.
