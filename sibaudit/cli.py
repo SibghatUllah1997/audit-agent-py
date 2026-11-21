@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import io
 import os
 import sys
 from pathlib import Path
@@ -62,6 +63,15 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
             "'summary', 'github' (Actions workflow annotations), 'sarif' "
             "(SARIF 2.1.0 for code scanning upload), or 'markdown' (PR comment or "
             "job summary, grouped by severity)."
+        ),
+    )
+    parser.add_argument(
+        "--output",
+        metavar="FILE",
+        default=None,
+        help=(
+            "Write the formatted report to FILE instead of stdout (for example a CI "
+            "artifact). If omitted, SIBAUDIT_OUTPUT is read."
         ),
     )
     parser.add_argument(
@@ -323,7 +333,9 @@ def main(argv: list[str] | None = None) -> None:
                 f"{model.failures} finding(s); used catalog hints",
                 file=sys.stderr,
             )
-    _print_findings(findings, ns.format)
+    output = ns.output or os.environ.get("SIBAUDIT_OUTPUT")
+    output_path = Path(output) if output and str(output).strip() else None
+    _print_findings(findings, ns.format, output_path)
     if ns.html_report:
         try:
             Path(ns.html_report).write_text(format_html(findings, root), encoding="utf-8")
@@ -351,7 +363,22 @@ def _flag_or_env(flag_values: list[str], env_name: str) -> list[str]:
     return [value] if value else []
 
 
-def _print_findings(findings: list[Finding], fmt: str) -> None:
+def _print_findings(
+    findings: list[Finding], fmt: str, output_path: Path | None = None
+) -> None:
+    if output_path is None:
+        _write_findings(findings, fmt, sys.stdout)
+        return
+    buf = io.StringIO()
+    _write_findings(findings, fmt, buf)
+    try:
+        output_path.write_text(buf.getvalue(), encoding="utf-8")
+    except OSError as exc:
+        print(f"error: cannot write output file: {exc}", file=sys.stderr)
+        sys.exit(2)
+
+
+def _write_findings(findings: list[Finding], fmt: str, out: io.TextIOBase) -> None:
     if fmt == "json":
         import json
 
@@ -367,28 +394,28 @@ def _print_findings(findings: list[Finding], fmt: str) -> None:
                 record["suggestion"] = f.suggestion
                 if f.suggestion_source:
                     record["suggestion_source"] = f.suggestion_source
-            print(json.dumps(record, ensure_ascii=False))
+            print(json.dumps(record, ensure_ascii=False), file=out)
         return
     if fmt == "github":
         text = format_github_annotations(findings)
         if text:
-            print(text)
+            print(text, file=out)
         return
     if fmt == "sarif":
-        sys.stdout.write(format_sarif(findings))
+        out.write(format_sarif(findings))
         return
     if fmt == "markdown":
-        sys.stdout.write(format_markdown(findings))
+        out.write(format_markdown(findings))
         return
     if fmt == "summary":
-        print(format_summary(findings))
+        print(format_summary(findings), file=out)
         return
     for f in findings:
         rel = str(Path(f.file_path))
-        print(f"{rel}:{f.line_number}: {f.code} {f.message}")
+        print(f"{rel}:{f.line_number}: {f.code} {f.message}", file=out)
         if f.suggestion:
-            print(f"    hint: {f.suggestion}")
+            print(f"    hint: {f.suggestion}", file=out)
     if findings:
-        print()
-        print(format_summary(findings))
+        print(file=out)
+        print(format_summary(findings), file=out)
 
