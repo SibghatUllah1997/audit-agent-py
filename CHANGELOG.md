@@ -1,6 +1,11 @@
 # Changelog
 
 ## 2026-11-21
+- Added rule A030 to flag ERC-20 `approve` of `type(uint256).max` (and the usual aliases such as `~uint256(0)`), which grants an unlimited allowance a compromised spender can drain.
+- Added `--output FILE` (and `SIBAUDIT_OUTPUT`) so the chosen `--format` is written to a file instead of stdout, which is handy as a CI artifact without a shell redirect.
+- Marked days 50 and 51 complete on the roadmap.
+
+## 2026-11-21
 - Added `--format markdown`: a total, counts per rule, and one findings table per severity, ready for a PR comment or `$GITHUB_STEP_SUMMARY`.
 - Source text is escaped so it cannot break a table, and rows stop at 200 to stay under GitHub's comment limit while counts stay exact.
 - Added `examples/github/job-summary.yml` and marked day 49 complete on the roadmap.

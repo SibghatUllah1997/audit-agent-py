@@ -242,3 +242,23 @@ def test_unbounded_loop_and_changed_since_are_documented_and_days_47_48_are_done
         "- [x] Day 48: Add `--changed-since REF` to scan only Solidity files "
         "changed against a git ref"
     ) in roadmap
+
+
+def test_unlimited_approve_and_output_file_are_documented_and_days_50_51_are_done() -> None:
+    text = README.read_text(encoding="utf-8")
+    assert "| A030 | MEDIUM" in text
+    assert "--output" in text
+    assert "SIBAUDIT_OUTPUT" in text
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert "## 2026-11-21" in changelog
+    assert "A030" in changelog
+    assert "--output" in changelog
+    roadmap = ROADMAP.read_text(encoding="utf-8")
+    assert (
+        "- [x] Day 50: Add rule A030: ERC-20 `approve` of `type(uint256).max` "
+        "(unlimited allowance)"
+    ) in roadmap
+    assert (
+        "- [x] Day 51: Add `--output FILE` to write the chosen `--format` to a "
+        "file (CI artifact)"
+    ) in roadmap

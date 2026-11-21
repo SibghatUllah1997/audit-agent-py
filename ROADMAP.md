@@ -59,3 +59,5 @@ Token-handling rules and CI-facing output. Same pace: one shippable step per day
 - [x] Day 47: Add rule A029: loop over an unbounded storage array in a state-changing function (gas DoS)
 - [x] Day 48: Add `--changed-since REF` to scan only Solidity files changed against a git ref
 - [x] Day 49: Add `--format markdown` for PR comments and `$GITHUB_STEP_SUMMARY`, grouped by severity
+- [x] Day 50: Add rule A030: ERC-20 `approve` of `type(uint256).max` (unlimited allowance)
+- [x] Day 51: Add `--output FILE` to write the chosen `--format` to a file (CI artifact)
