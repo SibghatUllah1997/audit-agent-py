@@ -129,3 +129,12 @@ def test_sample_contract_flags_unbounded_storage_loop() -> None:
     assert "recipients.length" in loops[0].line_text
     assert "run out of gas" in loops[0].message
     assert loops[0].severity == "HIGH"
+
+
+def test_sample_contract_flags_unlimited_approve() -> None:
+    findings = scan_paths([str(EXAMPLES)])
+    unlimited = [f for f in findings if f.code == "A030"]
+    assert len(unlimited) == 1
+    assert "type(uint256).max" in unlimited[0].line_text
+    assert "unlimited allowance" in unlimited[0].message
+    assert unlimited[0].severity == "MEDIUM"

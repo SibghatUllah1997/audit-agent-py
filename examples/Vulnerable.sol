@@ -197,6 +197,7 @@ contract EoaGate {
 // Some tokens return false instead of reverting, so a dropped result hides failures.
 interface IERC20 {
     function transfer(address to, uint256 amount) external returns (bool);
+    function approve(address spender, uint256 amount) external returns (bool);
 }
 
 contract TokenPayout {
@@ -205,6 +206,16 @@ contract TokenPayout {
     function pay(address to, uint256 amount) external {
         // A028
         token.transfer(to, amount);
+    }
+}
+
+// An unlimited allowance lets a compromised spender drain current and future tokens.
+contract TokenSpender {
+    IERC20 public token;
+
+    function allow(address spender) external {
+        // A030
+        require(token.approve(spender, type(uint256).max), "approve failed");
     }
 }
 
