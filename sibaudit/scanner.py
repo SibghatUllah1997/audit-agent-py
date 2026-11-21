@@ -2450,6 +2450,100 @@ def _detect_unchecked_erc20_return(
             )
 
 
+UNLIMITED_AMOUNT_PATTERN = re.compile(
+    r"^(?:"
+    r"type\s*\(\s*uint(?:256)?\s*\)\s*\.\s*max(?:\s*-\s*1)?"
+    r"|~\s*uint(?:256)?\s*\(\s*0\s*\)"
+    r"|2\s*\*\*\s*256\s*-\s*1"
+    r"|0x[fF]{64}"
+    r"|uint(?:256)?\s*\(\s*-\s*1\s*\)"
+    r")$",
+    re.IGNORECASE,
+)
+SIMPLE_NAME_PATTERN = re.compile(r"^[A-Za-z_]\w*$")
+NAME_ASSIGN_PATTERN = re.compile(
+    r"\b(?P<name>[A-Za-z_]\w*)\s*=(?!=)\s*(?P<value>[^;]+);"
+)
+
+
+def _unwrap_parens(text: str) -> str:
+    """Strip a wrapping ``(...)`` that covers the whole expression."""
+    text = " ".join(text.split())
+    while len(text) >= 2 and text[0] == "(" and text[-1] == ")":
+        depth = 0
+        wraps = True
+        for index, char in enumerate(text):
+            if char == "(":
+                depth += 1
+            elif char == ")":
+                depth -= 1
+                if depth == 0 and index != len(text) - 1:
+                    wraps = False
+                    break
+        if not wraps or depth != 0:
+            break
+        text = text[1:-1].strip()
+    return text
+
+
+def _is_unlimited_amount(text: str) -> bool:
+    return bool(UNLIMITED_AMOUNT_PATTERN.fullmatch(_unwrap_parens(text)))
+
+
+def _unlimited_names(source: str) -> set[str]:
+    """Names assigned an unlimited uint (``type(uint256).max``, ``~uint256(0)``, ...)."""
+    return {
+        match.group("name")
+        for match in NAME_ASSIGN_PATTERN.finditer(source)
+        if _is_unlimited_amount(match.group("value"))
+    }
+
+
+def _detect_unlimited_erc20_approve(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    # approve(spender, type(uint256).max) (and the usual aliases) grants a
+    # spender the whole balance, including tokens received later. A finite
+    # amount, or a permit with a deadline, keeps the allowance bounded.
+    token_names = _erc20_names(lines)
+    unlimited = _unlimited_names(_comment_stripped_source(lines))
+    for start_line, end_line in _callable_spans(lines):
+        source = _span_source(lines, start_line, end_line)
+        for match in ERC20_CALL_PATTERN.finditer(source):
+            if match.group("method") != "approve":
+                continue
+            close_end = _close_paren_end(source, match.end() - 1)
+            if close_end is None:
+                continue
+            args = _split_top_level_args(source[match.end() : close_end - 1])
+            if len(args) != 2:
+                continue
+            receiver_start = _receiver_start(source, match.start())
+            if not _is_erc20_receiver(source[receiver_start : match.start()], token_names):
+                continue
+            amount = _unwrap_parens(args[1])
+            if not (
+                _is_unlimited_amount(amount)
+                or (SIMPLE_NAME_PATTERN.fullmatch(amount) and amount in unlimited)
+            ):
+                continue
+            line_no = start_line + source[: match.start()].count("\n")
+            if ignore_next_lines and line_no in ignore_next_lines:
+                continue
+            yield Finding(
+                file_path=file_path,
+                line_number=line_no,
+                code="A030",
+                severity="MEDIUM",
+                message=(
+                    "ERC-20 approve() uses an unlimited allowance; a compromised spender "
+                    "can drain the balance. Approve a finite amount or use a permit "
+                    "with a deadline."
+                ),
+                line_text=lines[line_no - 1].rstrip(),
+            )
+
+
 DYNAMIC_ARRAY_STATE_PATTERN = re.compile(
     r"\b(?:address|bool|string|bytes(?:[1-9]|[12]\d|3[0-2])?|bytes|u?int(?:\d+)?|[A-Z]\w*)"
     r"(?:\s+payable)?"
@@ -2662,6 +2756,7 @@ _DETECTORS = (
     _detect_extcodesize_eoa_check,
     _detect_floating_pragma,
     _detect_unchecked_erc20_return,
+    _detect_unlimited_erc20_approve,
     _detect_unbounded_storage_loop,
 )
 

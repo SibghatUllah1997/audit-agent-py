@@ -1146,3 +1146,47 @@ contract Airdrop {
     }
 }
 ```
+
+## A030: ERC-20 `approve` of `type(uint256).max` (unlimited allowance)
+
+Severity: **MEDIUM**
+
+An `approve` of `type(uint256).max` (or `~uint256(0)`, `2**256-1`, and the other usual aliases) lets the spender pull the current balance and every token received later. If that spender is a router that is later compromised, or the allowance is never cleared, funds keep draining. Approve only the amount needed for this call, or use a permit with a deadline.
+
+Flagged:
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
+
+interface IERC20 {
+    function approve(address spender, uint256 amount) external returns (bool);
+}
+
+contract Spender {
+    IERC20 public token;
+
+    function allow(address spender) external {
+        require(token.approve(spender, type(uint256).max), "approve failed");
+    }
+}
+```
+
+Fixed:
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
+
+interface IERC20 {
+    function approve(address spender, uint256 amount) external returns (bool);
+}
+
+contract Spender {
+    IERC20 public token;
+
+    function allow(address spender, uint256 amount) external {
+        require(token.approve(spender, amount), "approve failed");
+    }
+}
+```

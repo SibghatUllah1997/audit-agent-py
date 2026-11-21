@@ -42,6 +42,7 @@ Rules
 | A027 | HIGH     | `extcodesize` / `.code.length == 0` used as an EOA check |
 | A028 | MEDIUM   | ERC-20 `transfer`/`transferFrom`/`approve` result ignored |
 | A029 | HIGH     | Unbounded loop over a storage array in a state-changing function |
+| A030 | MEDIUM   | ERC-20 `approve` of `type(uint256).max` (unlimited allowance) |
 
 Install
 - Python 3.11+

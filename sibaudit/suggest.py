@@ -267,6 +267,12 @@ _HINTS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
         "the whole storage array in one transaction.",
         (),
     ),
+    (
+        "A030",
+        "Approve only the amount needed for this call, or use a permit with a "
+        "deadline, instead of type(uint256).max.",
+        (),
+    ),
 )
 
 
