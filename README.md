@@ -195,10 +195,12 @@ Exit policy and HTML report
 ```bash
 python3 -m sibaudit --fail-on HIGH path/to/contracts
 python3 -m sibaudit --html-report sibaudit.html path/to/contracts
+python3 -m sibaudit --format sarif --output sibaudit.sarif path/to/contracts
 ```
 
 - By default the exit code is 1 when any finding is reported. `--fail-on LEVEL` exits 1 only when a reported finding is at `LEVEL` or above; `--fail-on never` always exits 0. Every finding is still printed. `SIBAUDIT_FAIL_ON` is read when the flag is omitted.
 - `--html-report FILE` also writes a single self-contained HTML page with counts by severity and by rule and a table of every finding, highest severity first. It has no scripts, no remote assets and no timestamp, so it can be kept as a CI artifact and diffed. Normal output still goes to stdout.
+- `--output FILE` writes the chosen `--format` to FILE instead of stdout (stderr still gets errors and baseline notes). If the flag is omitted, `SIBAUDIT_OUTPUT` is read. An unwritable path exits with code 2.
 
 Project layouts
 
@@ -331,7 +333,7 @@ SARIF for code scanning
 `--format sarif` prints one SARIF 2.1.0 log for the whole scan, so findings can be uploaded to GitHub code scanning (or any SARIF viewer). HIGH maps to `error`, MEDIUM to `warning`, and LOW to `note`; each rule also carries a `security-severity` score.
 
 ```bash
-python3 -m sibaudit --format sarif --fail-on never path/to/contracts > sibaudit.sarif
+python3 -m sibaudit --format sarif --fail-on never --output sibaudit.sarif path/to/contracts
 ```
 
 - Paths are relative to the current directory, so run it from the repository root.

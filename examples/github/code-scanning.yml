@@ -31,7 +31,7 @@ jobs:
           pip install sibaudit
 
       - name: Scan Solidity files
-        run: python3 -m sibaudit --format sarif --fail-on never . > sibaudit.sarif
+        run: python3 -m sibaudit --format sarif --fail-on never --output sibaudit.sarif .
 
       - name: Upload SARIF
         uses: github/codeql-action/upload-sarif@v3

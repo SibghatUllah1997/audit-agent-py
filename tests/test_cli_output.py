@@ -6,6 +6,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[1]
+CODE_SCANNING = ROOT / "examples" / "github" / "code-scanning.yml"
+
 RISKY = """
 pragma solidity 0.8.20;
 contract C {
@@ -136,3 +139,9 @@ def test_html_report_still_works_with_output(tmp_path: Path) -> None:
     assert "A001" in text_report.read_text(encoding="utf-8")
     assert "<!DOCTYPE html>" in html_report.read_text(encoding="utf-8")
     assert proc.stdout == ""
+
+
+def test_code_scanning_example_uses_output_flag() -> None:
+    text = CODE_SCANNING.read_text(encoding="utf-8")
+    assert "--output sibaudit.sarif" in text
+    assert "> sibaudit.sarif" not in text
