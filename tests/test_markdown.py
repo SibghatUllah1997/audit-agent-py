@@ -130,3 +130,10 @@ def test_cli_markdown_clean_file(tmp_path: Path) -> None:
     )
     assert proc.returncode == 0
     assert proc.stdout == "## sibaudit\n\nNo findings.\n"
+
+
+def test_job_summary_example_writes_markdown() -> None:
+    text = (ROOT / "examples" / "github" / "job-summary.yml").read_text()
+    assert text.lstrip().startswith("# Copy this file to .github/workflows/")
+    assert "--format markdown" in text
+    assert '>> "$GITHUB_STEP_SUMMARY"' in text

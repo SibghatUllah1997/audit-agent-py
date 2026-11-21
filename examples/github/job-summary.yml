@@ -1,0 +1,30 @@
+# Copy this file to .github/workflows/sibaudit-summary.yml in a Solidity project.
+# The markdown report lands on the run's summary page, grouped by severity.
+# --fail-on high keeps the job green for medium and low findings.
+name: sibaudit summary
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install sibaudit
+        run: |
+          python -m pip install --upgrade pip
+          pip install sibaudit
+
+      - name: Scan Solidity files
+        run: python3 -m sibaudit --format markdown --fail-on high . >> "$GITHUB_STEP_SUMMARY"
