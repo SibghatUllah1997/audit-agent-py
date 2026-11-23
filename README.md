@@ -102,6 +102,7 @@ Example output (real):
 /workspace/examples/Vulnerable.sol:208: A028 ERC-20 transfer() return value is ignored; some tokens return false instead of reverting. Use SafeERC20 or check the result.
 /workspace/examples/Vulnerable.sol:218: A030 ERC-20 approve() uses an unlimited allowance; a compromised spender can drain the balance. Approve a finite amount or use a permit with a deadline.
 /workspace/examples/Vulnerable.sol:234: A029 Unbounded loop over storage array "recipients" in a state-changing function; a long list can run out of gas.
+/workspace/examples/Vulnerable.sol:246: A031 block.prevrandao is known to the block proposer and can be biased; use a VRF or commit-reveal for randomness.
 ```
 
 Notes
