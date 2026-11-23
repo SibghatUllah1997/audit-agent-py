@@ -236,3 +236,13 @@ contract Airdrop {
         }
     }
 }
+
+// The proposer sees prevrandao before publishing and can re-roll it by skipping a slot.
+contract Lottery {
+    address[] public players;
+
+    function pick() external view returns (address) {
+        // A031
+        return players[block.prevrandao % players.length];
+    }
+}

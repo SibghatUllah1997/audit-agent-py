@@ -273,6 +273,12 @@ _HINTS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
         "deadline, instead of type(uint256).max.",
         (),
     ),
+    (
+        "A031",
+        "prevrandao is visible to the block proposer; "
+        "use a VRF or commit-reveal instead of it as randomness.",
+        (),
+    ),
 )
 
 

@@ -1115,6 +1115,44 @@ RULES: tuple[Rule, ...] = (
             """
         ),
     ),
+    Rule(
+        code="A031",
+        severity="MEDIUM",
+        title="`block.prevrandao` / `block.difficulty` used as randomness",
+        rationale=(
+            "Since the Merge, `block.difficulty` is an alias of `block.prevrandao`. The "
+            "proposer knows the value before publishing the block and can skip its slot "
+            "to re-roll it, and anyone can read it in the same transaction, so a lottery "
+            "or mint that branches on it can be gamed. Use a VRF or a commit-reveal scheme."
+        ),
+        flagged=_sol(
+            """
+            contract Lottery {
+                address[] public players;
+
+                function pick() external view returns (address) {
+                    return players[block.prevrandao % players.length];
+                }
+            }
+            """
+        ),
+        fixed=_sol(
+            """
+            contract Lottery {
+                address[] public players;
+                uint256 public randomWord;
+
+                function onRandom(uint256 word) external {
+                    randomWord = word;
+                }
+
+                function pick() external view returns (address) {
+                    return players[randomWord % players.length];
+                }
+            }
+            """
+        ),
+    ),
 )
 
 _BY_CODE = {rule.code: rule for rule in RULES}

@@ -43,6 +43,7 @@ Rules
 | A028 | MEDIUM   | ERC-20 `transfer`/`transferFrom`/`approve` result ignored |
 | A029 | HIGH     | Unbounded loop over a storage array in a state-changing function |
 | A030 | MEDIUM   | ERC-20 `approve` of `type(uint256).max` (unlimited allowance) |
+| A031 | MEDIUM   | `block.prevrandao` / `block.difficulty` used as randomness |
 
 Install
 - Python 3.11+
@@ -101,6 +102,7 @@ Example output (real):
 /workspace/examples/Vulnerable.sol:208: A028 ERC-20 transfer() return value is ignored; some tokens return false instead of reverting. Use SafeERC20 or check the result.
 /workspace/examples/Vulnerable.sol:218: A030 ERC-20 approve() uses an unlimited allowance; a compromised spender can drain the balance. Approve a finite amount or use a permit with a deadline.
 /workspace/examples/Vulnerable.sol:234: A029 Unbounded loop over storage array "recipients" in a state-changing function; a long list can run out of gas.
+/workspace/examples/Vulnerable.sol:246: A031 block.prevrandao is known to the block proposer and can be biased; use a VRF or commit-reveal for randomness.
 ```
 
 Notes

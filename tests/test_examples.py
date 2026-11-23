@@ -138,3 +138,12 @@ def test_sample_contract_flags_unlimited_approve() -> None:
     assert "type(uint256).max" in unlimited[0].line_text
     assert "unlimited allowance" in unlimited[0].message
     assert unlimited[0].severity == "MEDIUM"
+
+
+def test_sample_contract_flags_prevrandao_randomness() -> None:
+    findings = scan_paths([str(EXAMPLES)])
+    weak = [f for f in findings if f.code == "A031"]
+    assert len(weak) == 1
+    assert "block.prevrandao" in weak[0].line_text
+    assert "VRF" in weak[0].message
+    assert weak[0].severity == "MEDIUM"

@@ -940,6 +940,109 @@ def _detect_blockhash_misuse(
         )
 
 
+PREVRANDAO_PATTERN = re.compile(r"\bblock\s*\.\s*(?P<field>prevrandao|difficulty)\b")
+YUL_PREVRANDAO_PATTERN = re.compile(r"(?<![\w.])(?P<field>prevrandao|difficulty)\s*\(\s*\)")
+ASSEMBLY_START_PATTERN = re.compile(r"\bassembly\b[^{;]*\{")
+
+
+def _code_only_lines(lines: list[str]) -> list[str]:
+    """Blank out comments (line and block) and string literals, keeping line count."""
+    out: list[str] = []
+    in_block = False
+    for line in lines:
+        chars: list[str] = []
+        i = 0
+        quote = ""
+        while i < len(line):
+            char = line[i]
+            nxt = line[i + 1] if i + 1 < len(line) else ""
+            if in_block:
+                if char == "*" and nxt == "/":
+                    in_block = False
+                    i += 2
+                else:
+                    i += 1
+                continue
+            if quote:
+                if char == "\\":
+                    i += 2
+                    continue
+                if char == quote:
+                    quote = ""
+                    chars.append(char)
+                i += 1
+                continue
+            if char == "/" and nxt == "/":
+                break
+            if char == "/" and nxt == "*":
+                in_block = True
+                i += 2
+                continue
+            if char in {'"', "'"}:
+                quote = char
+            chars.append(char)
+            i += 1
+        out.append("".join(chars))
+    return out
+
+
+def _assembly_lines(code_lines: list[str]) -> set[int]:
+    """1-based line numbers that sit inside an ``assembly { ... }`` block."""
+    text = "\n".join(code_lines)
+    inside: set[int] = set()
+    for match in ASSEMBLY_START_PATTERN.finditer(text):
+        depth = 0
+        end = len(text)
+        for index in range(match.end() - 1, len(text)):
+            if text[index] == "{":
+                depth += 1
+            elif text[index] == "}":
+                depth -= 1
+                if depth == 0:
+                    end = index
+                    break
+        first = text.count("\n", 0, match.start()) + 1
+        last = text.count("\n", 0, end) + 1
+        inside.update(range(first, last + 1))
+    return inside
+
+
+def _detect_prevrandao_randomness(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    # Since the Merge, block.difficulty is an alias of block.prevrandao. The
+    # proposer sees it before publishing and can skip a slot to re-roll it, so
+    # it is not a safe source of randomness when value depends on the outcome.
+    code_lines = _code_only_lines(lines)
+    assembly = _assembly_lines(code_lines)
+    for idx, code in enumerate(code_lines, start=1):
+        if ignore_next_lines and idx in ignore_next_lines:
+            continue
+        match = PREVRANDAO_PATTERN.search(code)
+        if match is None and idx in assembly:
+            match = YUL_PREVRANDAO_PATTERN.search(code)
+        if match is None:
+            continue
+        field = match.group("field")
+        if field == "difficulty":
+            message = (
+                "block.difficulty is an alias of prevrandao since the Merge and can be "
+                "biased by the block proposer; use a VRF or commit-reveal for randomness."
+            )
+        else:
+            message = (
+                "block.prevrandao is known to the block proposer and can be biased; "
+                "use a VRF or commit-reveal for randomness."
+            )
+        yield Finding(
+            file_path=file_path,
+            line_number=idx,
+            code="A031",
+            severity="MEDIUM",
+            message=message,
+            line_text=lines[idx - 1].rstrip(),
+        )
+
 def _detect_events_missing_critical_params(
     lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
 ) -> Iterator[Finding]:
@@ -2758,6 +2861,7 @@ _DETECTORS = (
     _detect_unchecked_erc20_return,
     _detect_unlimited_erc20_approve,
     _detect_unbounded_storage_loop,
+    _detect_prevrandao_randomness,
 )
 
 
