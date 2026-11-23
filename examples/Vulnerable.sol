@@ -246,3 +246,21 @@ contract Lottery {
         return players[block.prevrandao % players.length];
     }
 }
+
+// A frozen or zero Chainlink round can price assets wrong if the answer is trusted as-is.
+interface AggregatorV3Interface {
+    function latestRoundData()
+        external
+        view
+        returns (uint80, int256, uint256, uint256, uint80);
+}
+
+contract OraclePrice {
+    AggregatorV3Interface public feed;
+
+    function read() external view returns (int256) {
+        // A032
+        (, int256 answer, , , ) = feed.latestRoundData();
+        return answer;
+    }
+}

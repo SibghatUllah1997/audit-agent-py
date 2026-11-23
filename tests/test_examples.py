@@ -147,3 +147,12 @@ def test_sample_contract_flags_prevrandao_randomness() -> None:
     assert "block.prevrandao" in weak[0].line_text
     assert "VRF" in weak[0].message
     assert weak[0].severity == "MEDIUM"
+
+
+def test_sample_contract_flags_unchecked_latest_round() -> None:
+    findings = scan_paths([str(EXAMPLES)])
+    stale = [f for f in findings if f.code == "A032"]
+    assert len(stale) == 1
+    assert "latestRoundData()" in stale[0].line_text
+    assert "staleness" in stale[0].message
+    assert stale[0].severity == "HIGH"
