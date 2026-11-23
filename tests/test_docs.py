@@ -262,3 +262,18 @@ def test_unlimited_approve_and_output_file_are_documented_and_days_50_51_are_don
         "- [x] Day 51: Add `--output FILE` to write the chosen `--format` to a "
         "file (CI artifact)"
     ) in roadmap
+
+
+def test_prevrandao_rule_is_documented_and_day_52_is_done() -> None:
+    text = README.read_text(encoding="utf-8")
+    assert "| A031 | MEDIUM" in text
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert "## 2026-11-23" in changelog
+    assert "A031" in changelog
+    roadmap = ROADMAP.read_text(encoding="utf-8")
+    assert "# Phase 4" in roadmap
+    assert (
+        "- [x] Day 52: Add rule A031: `block.prevrandao` / `block.difficulty` used as "
+        "randomness (proposer can bias it)"
+    ) in roadmap
+    assert "- [ ] Day 53: Add rule A032" in roadmap
