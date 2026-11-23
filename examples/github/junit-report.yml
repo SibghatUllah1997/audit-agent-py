@@ -1,0 +1,37 @@
+# Copy this file to .github/workflows/sibaudit-junit.yml in a Solidity project.
+# Findings are written as JUnit XML so a test publisher or artifact can show
+# each one with a file and line. The upload step runs even when the scan fails.
+name: sibaudit junit
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install sibaudit
+        run: |
+          python -m pip install --upgrade pip
+          pip install sibaudit
+
+      - name: Scan Solidity files
+        run: python3 -m sibaudit --format junit --output sibaudit-junit.xml .
+
+      - name: Upload JUnit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sibaudit-junit
+          path: sibaudit-junit.xml

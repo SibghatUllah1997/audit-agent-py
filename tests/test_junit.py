@@ -133,6 +133,14 @@ def test_cli_junit_on_sample() -> None:
     assert all(c.attrib["file"].endswith("examples/Vulnerable.sol") for c in list(suite))
 
 
+def test_junit_report_example_writes_xml_artifact() -> None:
+    text = (ROOT / "examples" / "github" / "junit-report.yml").read_text()
+    assert text.lstrip().startswith("# Copy this file to .github/workflows/")
+    assert "--format junit --output sibaudit-junit.xml" in text
+    assert "actions/upload-artifact@v4" in text
+    assert "if: always()" in text
+
+
 def test_cli_junit_clean_file(tmp_path: Path) -> None:
     sol = tmp_path / "Ok.sol"
     sol.write_text("pragma solidity 0.8.24;\ncontract Ok {}\n")

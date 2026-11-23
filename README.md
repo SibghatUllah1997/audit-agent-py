@@ -204,7 +204,7 @@ python3 -m sibaudit --format sarif --output sibaudit.sarif path/to/contracts
 
 - By default the exit code is 1 when any finding is reported. `--fail-on LEVEL` exits 1 only when a reported finding is at `LEVEL` or above; `--fail-on never` always exits 0. Every finding is still printed. `SIBAUDIT_FAIL_ON` is read when the flag is omitted.
 - `--html-report FILE` also writes a single self-contained HTML page with counts by severity and by rule and a table of every finding, highest severity first. It has no scripts, no remote assets and no timestamp, so it can be kept as a CI artifact and diffed. Normal output still goes to stdout.
-- `--output FILE` writes the chosen `--format` to FILE instead of stdout (stderr still gets errors and baseline notes). If the flag is omitted, `SIBAUDIT_OUTPUT` is read. An unwritable path exits with code 2.
+- `--output FILE` writes the chosen `--format` to FILE instead of stdout (stderr still gets errors and baseline notes). If the flag is omitted, `SIBAUDIT_OUTPUT` is read. An unwritable path exits with code 2. Use it for SARIF, markdown, or JUnit artifacts.
 
 Project layouts
 
@@ -356,6 +356,17 @@ python3 -m sibaudit --format markdown --fail-on high . >> "$GITHUB_STEP_SUMMARY"
 - Only the first 200 findings get a row, which keeps the report under GitHub's comment size limit. Counts always cover everything; use `--format json` for the full list.
 - `examples/github/job-summary.yml` writes the report to the run's summary page. Post the same output with `gh pr comment --body-file` if you want it on the PR.
 
+JUnit for CI test reports
+
+`--format junit` prints a JUnit XML suite: one failed testcase per finding (highest severity first), with `file` and `line` so a publisher can link back to the source. A clean scan is one passing `scan` testcase, not an empty suite. There is no timestamp, so the same scan gives the same XML.
+
+```bash
+python3 -m sibaudit --format junit --output sibaudit-junit.xml .
+```
+
+- Paths are relative to the current directory. Source text is XML-escaped, so a `<` in code cannot break the report.
+- `examples/github/junit-report.yml` writes the file with `--output` and uploads it as an artifact even when the scan fails.
+
 Use it as a GitHub Action
 
 `examples/github/annotate.yml` is a ready-made workflow. Copy it to `.github/workflows/sibaudit.yml` in a Solidity project:
@@ -422,7 +433,7 @@ flowchart TD
     CFG -->|--min-severity --only --except| FLT[Filter findings]
     FLT -->|optional baseline file| G[Suppress known issues]
     G -->|optional --suggest catalog/cmd| I[Local fix hints]
-    I -->|--format text/json/summary/github/sarif/markdown| H[stdout + exit code]
+    I -->|--format text/json/summary/github/sarif/markdown/junit| H[stdout + exit code]
 ```
 
 Roadmap
