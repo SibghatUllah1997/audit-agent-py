@@ -279,6 +279,12 @@ _HINTS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
         "use a VRF or commit-reveal instead of it as randomness.",
         (),
     ),
+    (
+        "A032",
+        "Require answer > 0 and that the round is complete (answeredInRound >= roundId) "
+        "or still within the feed's heartbeat.",
+        (),
+    ),
 )
 
 

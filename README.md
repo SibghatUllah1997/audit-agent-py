@@ -44,6 +44,7 @@ Rules
 | A029 | HIGH     | Unbounded loop over a storage array in a state-changing function |
 | A030 | MEDIUM   | ERC-20 `approve` of `type(uint256).max` (unlimited allowance) |
 | A031 | MEDIUM   | `block.prevrandao` / `block.difficulty` used as randomness |
+| A032 | HIGH     | Chainlink `latestRoundData` used without a staleness or `answer > 0` check |
 
 Install
 - Python 3.11+

@@ -1043,6 +1043,150 @@ def _detect_prevrandao_randomness(
             line_text=lines[idx - 1].rstrip(),
         )
 
+
+LATEST_ROUND_PATTERN = re.compile(r"\.\s*latestRoundData\s*\(")
+GUARD_CALL_PATTERN = re.compile(r"\b(?:require|if)\s*\(", re.IGNORECASE)
+IDENT_TAIL_PATTERN = re.compile(r"([A-Za-z_]\w*)\s*$")
+SINGLE_LHS_PATTERN = re.compile(
+    r"(?:[\w\s\[\]\(\)]+\s+)?(?P<name>[A-Za-z_]\w*)$"
+)
+STALE_TOKEN_PATTERN = re.compile(
+    r"\b(?:heartbeat|timeout|stale|maxage|maxdelay|updatedat)\w*\b"
+    r"|block\s*\.\s*timestamp|\bnow\b",
+    re.IGNORECASE,
+)
+
+
+def _assignment_lhs(source: str, expr_start: int) -> str | None:
+    """Text to the left of ``=`` for the statement that starts ``expr_start``."""
+    bound = max(
+        source.rfind(";", 0, expr_start),
+        source.rfind("{", 0, expr_start),
+        source.rfind("}", 0, expr_start),
+    )
+    chunk = source[bound + 1 : expr_start].rstrip()
+    if not chunk.endswith("="):
+        return None
+    if len(chunk) >= 2 and chunk[-2] in "=!<>":
+        return None
+    return chunk[:-1].strip() or None
+
+
+def _slot_ident(slot: str) -> str:
+    match = IDENT_TAIL_PATTERN.search(slot.strip())
+    return match.group(1) if match else ""
+
+
+def _tuple_slot_names(lhs: str) -> list[str] | None:
+    """Names unpacked from ``(roundId, answer, ...)``, including empty slots."""
+    lhs = lhs.strip()
+    if not lhs.startswith("("):
+        return None
+    inner = _extract_paren_args(lhs, 0)
+    if inner is None:
+        return None
+    return [_slot_ident(part) for part in _split_top_level(inner, ",")]
+
+
+def _guard_bodies(source: str) -> list[str]:
+    bodies: list[str] = []
+    for match in GUARD_CALL_PATTERN.finditer(source):
+        inner = _extract_paren_args(source, match.end() - 1)
+        if inner is not None:
+            bodies.append(inner)
+    return bodies
+
+
+def _name_in(text: str, name: str) -> bool:
+    return bool(re.search(rf"(?<![A-Za-z0-9_]){re.escape(name)}(?![A-Za-z0-9_])", text))
+
+
+def _name_nonzero(text: str, name: str) -> bool:
+    escaped = re.escape(name)
+    return bool(
+        re.search(
+            rf"(?<![A-Za-z0-9_]){escaped}(?![A-Za-z0-9_])\s*(?:>|>=|!=)\s*0\b"
+            rf"|\b0\s*(?:<|<=|!=)\s*(?<![A-Za-z0-9_]){escaped}(?![A-Za-z0-9_])",
+            text,
+        )
+    )
+
+
+def _answer_is_checked(source: str, answer: str) -> bool:
+    if not answer:
+        return False
+    return any(_name_nonzero(body, answer) for body in _guard_bodies(source))
+
+
+def _staleness_is_checked(
+    source: str, updated: str, round_id: str, answered: str
+) -> bool:
+    for body in _guard_bodies(source):
+        if updated and _name_in(body, updated) and (
+            STALE_TOKEN_PATTERN.search(body) or _name_nonzero(body, updated)
+        ):
+            return True
+        if round_id and answered and _name_in(body, round_id) and _name_in(body, answered):
+            return True
+    return False
+
+
+def _detect_unchecked_latest_round(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    # latestRoundData can return a zero answer or a frozen updatedAt. Pricing
+    # off that round without checking answer > 0 or freshness lets a stuck
+    # feed mint, liquidate, or settle at the wrong price.
+    message = (
+        "Chainlink latestRoundData() is used without a staleness or answer > 0 "
+        "check; a frozen or zero round can price assets wrong."
+    )
+    for start_line, end_line in _callable_spans(lines):
+        source = _span_source(lines, start_line, end_line)
+        for match in LATEST_ROUND_PATTERN.finditer(source):
+            close_end = _close_paren_end(source, match.end() - 1)
+            if close_end is None:
+                continue
+            line_no = start_line + source[: match.start()].count("\n")
+            if ignore_next_lines and line_no in ignore_next_lines:
+                continue
+            receiver_start = _receiver_start(source, match.start())
+            lhs = _assignment_lhs(source, receiver_start)
+            answer = ""
+            updated = ""
+            round_id = ""
+            answered = ""
+            if lhs:
+                slots = _tuple_slot_names(lhs)
+                if slots is not None:
+                    if len(slots) > 0:
+                        round_id = slots[0]
+                    if len(slots) > 1:
+                        answer = slots[1]
+                    if len(slots) > 3:
+                        updated = slots[3]
+                    if len(slots) > 4:
+                        answered = slots[4]
+                else:
+                    ident = SINGLE_LHS_PATTERN.search(lhs)
+                    if ident:
+                        base = ident.group("name")
+                        answer = f"{base}.answer"
+                        updated = f"{base}.updatedAt"
+            if _answer_is_checked(source, answer) or _staleness_is_checked(
+                source, updated, round_id, answered
+            ):
+                continue
+            yield Finding(
+                file_path=file_path,
+                line_number=line_no,
+                code="A032",
+                severity="HIGH",
+                message=message,
+                line_text=lines[line_no - 1].rstrip(),
+            )
+
+
 def _detect_events_missing_critical_params(
     lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
 ) -> Iterator[Finding]:
@@ -2862,6 +3006,7 @@ _DETECTORS = (
     _detect_unlimited_erc20_approve,
     _detect_unbounded_storage_loop,
     _detect_prevrandao_randomness,
+    _detect_unchecked_latest_round,
 )
 
 

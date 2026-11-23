@@ -1153,6 +1153,69 @@ RULES: tuple[Rule, ...] = (
             """
         ),
     ),
+    Rule(
+        code="A032",
+        severity="HIGH",
+        title="Chainlink `latestRoundData` used without a staleness or `answer > 0` check",
+        rationale=(
+            "`latestRoundData` can return a zero answer or a round that stopped updating. "
+            "Using that figure as a price lets a frozen or broken feed mint, liquidate, or "
+            "settle at the wrong value. Check `answer > 0` and that the round is complete "
+            "(`answeredInRound >= roundId`) or still fresh."
+        ),
+        flagged=_sol(
+            """
+            interface AggregatorV3Interface {
+                function latestRoundData()
+                    external
+                    view
+                    returns (uint80, int256, uint256, uint256, uint80);
+            }
+
+            contract Price {
+                AggregatorV3Interface public feed;
+
+                function read() external view returns (int256) {
+                    (, int256 answer, , , ) = feed.latestRoundData();
+                    return answer;
+                }
+            }
+            """
+        ),
+        fixed=_sol(
+            """
+            interface AggregatorV3Interface {
+                function latestRoundData()
+                    external
+                    view
+                    returns (
+                        uint80 roundId,
+                        int256 answer,
+                        uint256 startedAt,
+                        uint256 updatedAt,
+                        uint80 answeredInRound
+                    );
+            }
+
+            contract Price {
+                AggregatorV3Interface public feed;
+
+                function read() external view returns (int256) {
+                    (
+                        uint80 roundId,
+                        int256 answer,
+                        ,
+                        ,
+                        uint80 answeredInRound
+                    ) = feed.latestRoundData();
+                    require(answer > 0, "bad answer");
+                    require(answeredInRound >= roundId, "stale round");
+                    return answer;
+                }
+            }
+            """
+        ),
+    ),
 )
 
 _BY_CODE = {rule.code: rule for rule in RULES}
