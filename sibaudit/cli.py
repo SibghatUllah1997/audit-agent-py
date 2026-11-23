@@ -24,6 +24,7 @@ from .filters import (
     parse_severity,
     should_fail,
 )
+from .junit import format_junit
 from .markdown import format_markdown
 from .report import format_github_annotations, format_html, format_summary
 from .rules import format_explain, format_rule_list, get_rule
@@ -56,13 +57,14 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument(
         "--format",
-        choices=["text", "json", "summary", "github", "sarif", "markdown"],
+        choices=["text", "json", "summary", "github", "sarif", "markdown", "junit"],
         default="text",
         help=(
             "Output format: 'text' (default), 'json' (newline-delimited objects), "
             "'summary', 'github' (Actions workflow annotations), 'sarif' "
-            "(SARIF 2.1.0 for code scanning upload), or 'markdown' (PR comment or "
-            "job summary, grouped by severity)."
+            "(SARIF 2.1.0 for code scanning upload), 'markdown' (PR comment or "
+            "job summary, grouped by severity), or 'junit' (JUnit XML for CI "
+            "test reports)."
         ),
     )
     parser.add_argument(
@@ -406,6 +408,9 @@ def _write_findings(findings: list[Finding], fmt: str, out: io.TextIOBase) -> No
         return
     if fmt == "markdown":
         out.write(format_markdown(findings))
+        return
+    if fmt == "junit":
+        out.write(format_junit(findings))
         return
     if fmt == "summary":
         print(format_summary(findings), file=out)
