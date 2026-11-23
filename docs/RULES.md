@@ -1190,3 +1190,44 @@ contract Spender {
     }
 }
 ```
+
+## A031: `block.prevrandao` / `block.difficulty` used as randomness
+
+Severity: **MEDIUM**
+
+Since the Merge, `block.difficulty` is an alias of `block.prevrandao`. The proposer knows the value before publishing the block and can skip its slot to re-roll it, and anyone can read it in the same transaction, so a lottery or mint that branches on it can be gamed. Use a VRF or a commit-reveal scheme.
+
+Flagged:
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
+
+contract Lottery {
+    address[] public players;
+
+    function pick() external view returns (address) {
+        return players[block.prevrandao % players.length];
+    }
+}
+```
+
+Fixed:
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
+
+contract Lottery {
+    address[] public players;
+    uint256 public randomWord;
+
+    function onRandom(uint256 word) external {
+        randomWord = word;
+    }
+
+    function pick() external view returns (address) {
+        return players[randomWord % players.length];
+    }
+}
+```

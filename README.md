@@ -43,6 +43,7 @@ Rules
 | A028 | MEDIUM   | ERC-20 `transfer`/`transferFrom`/`approve` result ignored |
 | A029 | HIGH     | Unbounded loop over a storage array in a state-changing function |
 | A030 | MEDIUM   | ERC-20 `approve` of `type(uint256).max` (unlimited allowance) |
+| A031 | MEDIUM   | `block.prevrandao` / `block.difficulty` used as randomness |
 
 Install
 - Python 3.11+
