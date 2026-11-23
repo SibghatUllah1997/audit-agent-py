@@ -276,4 +276,23 @@ def test_prevrandao_rule_is_documented_and_day_52_is_done() -> None:
         "- [x] Day 52: Add rule A031: `block.prevrandao` / `block.difficulty` used as "
         "randomness (proposer can bias it)"
     ) in roadmap
-    assert "- [ ] Day 53: Add rule A032" in roadmap
+    assert "- [ ] Day 55: Cache per-file findings" in roadmap
+
+
+def test_latest_round_and_junit_are_documented_and_days_53_54_are_done() -> None:
+    text = README.read_text(encoding="utf-8")
+    assert "| A032 | HIGH" in text
+    assert "--format junit" in text
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert "## 2026-11-23" in changelog
+    assert "A032" in changelog
+    assert "junit" in changelog
+    roadmap = ROADMAP.read_text(encoding="utf-8")
+    assert (
+        "- [x] Day 53: Add rule A032: Chainlink `latestRoundData` used without a "
+        "staleness or `answer > 0` check"
+    ) in roadmap
+    assert (
+        "- [x] Day 54: Add `--format junit` so CI dashboards can show findings as "
+        "failed test cases"
+    ) in roadmap

@@ -1,6 +1,11 @@
 # Changelog
 
 ## 2026-11-23
+- Added rule A032 to flag Chainlink `latestRoundData` when the price is used without `answer > 0` or a round-freshness check.
+- Added `--format junit` so CI can publish each finding as a failed testcase with file and line.
+- Marked days 53 and 54 complete on the roadmap.
+
+## 2026-11-23
 - Added rule A031 to flag `block.prevrandao` and `block.difficulty` (and their Yul forms inside `assembly`) as a randomness source. The proposer sees the value early and can skip a slot to re-roll it.
 - Comments and string literals are skipped, and a regular function named `difficulty()` stays quiet.
 - Planned phase 4 on the roadmap (days 52-55) and marked day 52 complete.
