@@ -14,6 +14,7 @@ from .baseline import (
     rematch_baseline,
     write_baseline,
 )
+from .cache import ScanCache
 from .changed import ChangedError, filter_to_roots, list_changed_solidity
 from .config import ConfigError, apply_config, find_and_load_config, load_config
 from .filters import (
@@ -98,6 +99,16 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
             "Only scan Solidity files git reports as changed against REF "
             "(for example HEAD~1 or origin/main). Untracked .sol files are included. "
             "Path arguments still limit which of those files are scanned."
+        ),
+    )
+    parser.add_argument(
+        "--cache",
+        metavar="FILE",
+        default=None,
+        help=(
+            "Reuse findings for files whose content has not changed since the last "
+            "run, stored in FILE (for example .sibaudit-cache.json). Upgrading or "
+            "editing rules resets it. If omitted, SIBAUDIT_CACHE is read."
         ),
     )
     parser.add_argument(
@@ -256,7 +267,15 @@ def main(argv: list[str] | None = None) -> None:
     except ChangedError as exc:
         print(f"error: {exc}", file=sys.stderr)
         sys.exit(2)
-    findings = scan_paths(scan_roots, include=ns.include, exclude=ns.exclude)
+    cache_name = ns.cache or os.environ.get("SIBAUDIT_CACHE")
+    cache = ScanCache.load(Path(cache_name)) if cache_name and cache_name.strip() else None
+    findings = scan_paths(scan_roots, include=ns.include, exclude=ns.exclude, cache=cache)
+    if cache is not None:
+        try:
+            cache.save()
+        except OSError as exc:
+            # A cache we cannot write should never fail the scan itself.
+            print(f"warning: cannot write cache file: {exc}", file=sys.stderr)
     findings = apply_config(findings, config)
     try:
         findings = apply_filters(
