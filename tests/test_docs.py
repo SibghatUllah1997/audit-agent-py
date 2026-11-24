@@ -307,3 +307,23 @@ def test_scan_cache_is_documented_and_day_55_is_done() -> None:
     assert "--cache FILE" in changelog
     roadmap = ROADMAP.read_text(encoding="utf-8")
     assert "- [x] Day 55: Cache per-file findings by content hash" in roadmap
+
+
+def test_latest_answer_and_zero_slippage_are_documented_and_days_56_57_are_done() -> None:
+    text = README.read_text(encoding="utf-8")
+    assert "| A033 | HIGH" in text
+    assert "| A034 | HIGH" in text
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert "## 2026-11-24" in changelog
+    assert "A033" in changelog
+    assert "A034" in changelog
+    roadmap = ROADMAP.read_text(encoding="utf-8")
+    assert "# Phase 5" in roadmap
+    assert (
+        "- [x] Day 56: Add rule A033: Chainlink `latestAnswer` used without an "
+        "`answer > 0` check"
+    ) in roadmap
+    assert (
+        "- [x] Day 57: Add rule A034: Uniswap-style swap with `amountOutMin` / "
+        "`amountOutMinimum` of 0 (no slippage)"
+    ) in roadmap

@@ -70,3 +70,12 @@ Randomness and oracle rules, plus faster repeat scans. Still one shippable step 
 - [x] Day 53: Add rule A032: Chainlink `latestRoundData` used without a staleness or `answer > 0` check
 - [x] Day 54: Add `--format junit` so CI dashboards can show findings as failed test cases
 - [x] Day 55: Cache per-file findings by content hash so repeat scans of large repos skip unchanged files
+
+# Phase 5
+
+Leftover oracle checks and DeFi swap guards. Same pace: one shippable step per day, heuristic and dependency-free.
+
+- [x] Day 56: Add rule A033: Chainlink `latestAnswer` used without an `answer > 0` check
+- [x] Day 57: Add rule A034: Uniswap-style swap with `amountOutMin` / `amountOutMinimum` of 0 (no slippage)
+- [ ] Day 58: Add rule A035: EIP-2612 `permit` called with a zero deadline
+- [ ] Day 59: Print cache hit/miss counts to stderr when `--cache` is set

@@ -1,6 +1,11 @@
 # Changelog
 
 ## 2026-11-24
+- Added rule A033 to flag Chainlink `latestAnswer` when the price is used without `answer > 0`.
+- Added rule A034 to flag Uniswap-style swaps whose `amountOutMin` is 0, so a sandwich can steal the whole output.
+- Planned phase 5 on the roadmap (days 56-59) and marked days 56 and 57 complete.
+
+## 2026-11-24
 - Added `--cache FILE` (and `SIBAUDIT_CACHE`) so repeat scans reuse findings for files whose SHA-256 has not changed and only run detectors on edited files.
 - The cache is tied to the version and the rule code, so an upgrade or a rule change starts it fresh; a corrupt or unwritable cache never fails the scan.
 - Marked day 55 complete on the roadmap.
