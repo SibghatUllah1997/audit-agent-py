@@ -46,6 +46,7 @@ Rules
 | A031 | MEDIUM   | `block.prevrandao` / `block.difficulty` used as randomness |
 | A032 | HIGH     | Chainlink `latestRoundData` used without a staleness or `answer > 0` check |
 | A033 | HIGH     | Chainlink `latestAnswer` used without an `answer > 0` check |
+| A034 | HIGH     | Uniswap-style swap with `amountOutMin` of 0 (no slippage) |
 
 Install
 - Python 3.11+

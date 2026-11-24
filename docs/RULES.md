@@ -1343,3 +1343,72 @@ contract Price {
     }
 }
 ```
+
+## A034: Uniswap-style swap with `amountOutMin` of 0 (no slippage)
+
+Severity: **HIGH**
+
+A `swapExact*` or `exactInput` call with `amountOutMin` / `amountOutMinimum` set to 0 accepts any output, including dust. A sandwich can buy before you and sell after, taking the whole trade. Pass a minimum the caller is willing to receive, typically from a quoted amount minus slippage.
+
+Flagged:
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
+
+interface IUniswapV2Router {
+    function swapExactTokensForTokens(
+        uint256 amountIn,
+        uint256 amountOutMin,
+        address[] calldata path,
+        address to,
+        uint256 deadline
+    ) external returns (uint256[] memory amounts);
+}
+
+contract Seller {
+    IUniswapV2Router public router;
+
+    function dump(
+        uint256 amountIn,
+        address[] calldata path,
+        uint256 deadline
+    ) external {
+        router.swapExactTokensForTokens(
+            amountIn, 0, path, msg.sender, deadline
+        );
+    }
+}
+```
+
+Fixed:
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
+
+interface IUniswapV2Router {
+    function swapExactTokensForTokens(
+        uint256 amountIn,
+        uint256 amountOutMin,
+        address[] calldata path,
+        address to,
+        uint256 deadline
+    ) external returns (uint256[] memory amounts);
+}
+
+contract Seller {
+    IUniswapV2Router public router;
+
+    function dump(
+        uint256 amountIn,
+        uint256 amountOutMin,
+        address[] calldata path,
+        uint256 deadline
+    ) external {
+        router.swapExactTokensForTokens(
+            amountIn, amountOutMin, path, msg.sender, deadline
+        );
+    }
+}
+```

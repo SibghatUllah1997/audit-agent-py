@@ -291,6 +291,12 @@ _HINTS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
         "and check that the round is complete or still within the heartbeat.",
         (),
     ),
+    (
+        "A034",
+        "Pass a non-zero amountOutMin (or amountOutMinimum) the caller will accept, "
+        "so a sandwich cannot drain the swap.",
+        (),
+    ),
 )
 
 

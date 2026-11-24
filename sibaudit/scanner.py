@@ -1246,6 +1246,81 @@ def _detect_unchecked_latest_answer(
             )
 
 
+SWAP_EXACT_PATTERN = re.compile(
+    r"\.\s*(?P<method>"
+    r"swapExactTokensForTokens(?:SupportingFeeOnTransferTokens)?"
+    r"|swapExactETHForTokens(?:SupportingFeeOnTransferTokens)?"
+    r"|swapExactTokensForETH(?:SupportingFeeOnTransferTokens)?"
+    r"|exactInputSingle"
+    r"|exactInput"
+    r")\s*(?:\{[^}]*\})?\s*\(",
+    re.IGNORECASE,
+)
+AMOUNT_OUT_MIN_FIELD_PATTERN = re.compile(
+    r"\bamountOutMin(?:imum)?\s*:\s*(?P<value>[^,}\n]+)",
+    re.IGNORECASE,
+)
+ZERO_AMOUNT_PATTERN = re.compile(
+    r"^(?:0(?:x0+)?|u?int(?:\d+)?\s*\(\s*0(?:x0+)?\s*\))$",
+    re.IGNORECASE,
+)
+
+
+def _swap_min_out_index(method: str) -> int | None:
+    """Positional index of ``amountOutMin`` on Uniswap V2 ``swapExact*`` helpers."""
+    name = method.lower()
+    if name.startswith("swapexactethfortokens"):
+        return 0
+    if name.startswith("swapexacttokensfor"):
+        return 1
+    return None
+
+
+def _is_zero_amount(text: str) -> bool:
+    return bool(ZERO_AMOUNT_PATTERN.fullmatch(_unwrap_parens(text.strip())))
+
+
+def _detect_zero_slippage_swap(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    # amountOutMin / amountOutMinimum of 0 lets a sandwich take the whole
+    # output. A caller-chosen minimum (even a small one) is enough to stay quiet.
+    message = (
+        "Uniswap-style swap uses amountOutMin 0, so a sandwich can steal the whole "
+        "output. Set a minimum the caller is willing to receive."
+    )
+    for start_line, end_line in _callable_spans(lines):
+        source = _span_source(lines, start_line, end_line)
+        for match in SWAP_EXACT_PATTERN.finditer(source):
+            close_end = _close_paren_end(source, match.end() - 1)
+            if close_end is None:
+                continue
+            line_no = start_line + source[: match.start()].count("\n")
+            if ignore_next_lines and line_no in ignore_next_lines:
+                continue
+            args_text = source[match.end() : close_end - 1]
+            flagged = False
+            field = AMOUNT_OUT_MIN_FIELD_PATTERN.search(args_text)
+            if field and _is_zero_amount(field.group("value")):
+                flagged = True
+            else:
+                index = _swap_min_out_index(match.group("method"))
+                if index is not None:
+                    args = _split_top_level_args(args_text)
+                    if len(args) > index and _is_zero_amount(args[index]):
+                        flagged = True
+            if not flagged:
+                continue
+            yield Finding(
+                file_path=file_path,
+                line_number=line_no,
+                code="A034",
+                severity="HIGH",
+                message=message,
+                line_text=lines[line_no - 1].rstrip(),
+            )
+
+
 def _detect_events_missing_critical_params(
     lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
 ) -> Iterator[Finding]:
@@ -3067,6 +3142,7 @@ _DETECTORS = (
     _detect_prevrandao_randomness,
     _detect_unchecked_latest_round,
     _detect_unchecked_latest_answer,
+    _detect_zero_slippage_swap,
 )
 
 
