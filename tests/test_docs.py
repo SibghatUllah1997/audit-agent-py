@@ -276,7 +276,7 @@ def test_prevrandao_rule_is_documented_and_day_52_is_done() -> None:
         "- [x] Day 52: Add rule A031: `block.prevrandao` / `block.difficulty` used as "
         "randomness (proposer can bias it)"
     ) in roadmap
-    assert "- [ ] Day 55: Cache per-file findings" in roadmap
+    assert "Day 55: Cache per-file findings" in roadmap
 
 
 def test_latest_round_and_junit_are_documented_and_days_53_54_are_done() -> None:
@@ -296,3 +296,14 @@ def test_latest_round_and_junit_are_documented_and_days_53_54_are_done() -> None
         "- [x] Day 54: Add `--format junit` so CI dashboards can show findings as "
         "failed test cases"
     ) in roadmap
+
+
+def test_scan_cache_is_documented_and_day_55_is_done() -> None:
+    text = README.read_text(encoding="utf-8")
+    assert "--cache .sibaudit-cache.json" in text
+    assert "SIBAUDIT_CACHE" in text
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert "## 2026-11-24" in changelog
+    assert "--cache FILE" in changelog
+    roadmap = ROADMAP.read_text(encoding="utf-8")
+    assert "- [x] Day 55: Cache per-file findings by content hash" in roadmap
