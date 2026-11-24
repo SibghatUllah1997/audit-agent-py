@@ -45,6 +45,7 @@ Rules
 | A030 | MEDIUM   | ERC-20 `approve` of `type(uint256).max` (unlimited allowance) |
 | A031 | MEDIUM   | `block.prevrandao` / `block.difficulty` used as randomness |
 | A032 | HIGH     | Chainlink `latestRoundData` used without a staleness or `answer > 0` check |
+| A033 | HIGH     | Chainlink `latestAnswer` used without an `answer > 0` check |
 
 Install
 - Python 3.11+

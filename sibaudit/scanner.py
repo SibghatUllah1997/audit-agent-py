@@ -1188,6 +1188,64 @@ def _detect_unchecked_latest_round(
             )
 
 
+LATEST_ANSWER_PATTERN = re.compile(r"\.\s*latestAnswer\s*\(")
+CMP_ZERO_AFTER_PATTERN = re.compile(r"(?:>|>=|!=|<=|<)\s*0\b")
+CMP_ZERO_BEFORE_PATTERN = re.compile(r"\b0\s*(?:<|<=|!=|>|>=)\s*$")
+
+
+def _expr_compared_to_zero(source: str, start: int, end: int) -> bool:
+    """True if the call at ``[start:end]`` is compared with ``0`` (possibly through casts)."""
+    i = end
+    n = len(source)
+    while i < n and source[i] in " \t\n)":
+        i += 1
+    if CMP_ZERO_AFTER_PATTERN.match(source[i:]):
+        return True
+    j = start
+    while j > 0 and source[j - 1] in " \t\n(":
+        j -= 1
+    return bool(CMP_ZERO_BEFORE_PATTERN.search(source[:j]))
+
+
+def _detect_unchecked_latest_answer(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    # latestAnswer is the V2 feed API: one int256, no round id and no updatedAt.
+    # A zero or negative figure still prices mints, liquidations, and settlements.
+    message = (
+        "Chainlink latestAnswer() is used without an answer > 0 check; "
+        "a zero or negative round can price assets wrong."
+    )
+    for start_line, end_line in _callable_spans(lines):
+        source = _span_source(lines, start_line, end_line)
+        for match in LATEST_ANSWER_PATTERN.finditer(source):
+            close_end = _close_paren_end(source, match.end() - 1)
+            if close_end is None:
+                continue
+            line_no = start_line + source[: match.start()].count("\n")
+            if ignore_next_lines and line_no in ignore_next_lines:
+                continue
+            if _expr_compared_to_zero(source, match.start(), close_end):
+                continue
+            receiver_start = _receiver_start(source, match.start())
+            lhs = _assignment_lhs(source, receiver_start)
+            answer = ""
+            if lhs:
+                ident = SINGLE_LHS_PATTERN.search(lhs)
+                if ident:
+                    answer = ident.group("name")
+            if _answer_is_checked(source, answer):
+                continue
+            yield Finding(
+                file_path=file_path,
+                line_number=line_no,
+                code="A033",
+                severity="HIGH",
+                message=message,
+                line_text=lines[line_no - 1].rstrip(),
+            )
+
+
 def _detect_events_missing_critical_params(
     lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
 ) -> Iterator[Finding]:
@@ -3008,6 +3066,7 @@ _DETECTORS = (
     _detect_unbounded_storage_loop,
     _detect_prevrandao_randomness,
     _detect_unchecked_latest_round,
+    _detect_unchecked_latest_answer,
 )
 
 

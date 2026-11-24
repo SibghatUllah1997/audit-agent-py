@@ -1297,3 +1297,49 @@ contract Price {
     }
 }
 ```
+
+## A033: Chainlink `latestAnswer` used without an `answer > 0` check
+
+Severity: **HIGH**
+
+`latestAnswer` is the older Chainlink API: a single `int256` with no round id and no timestamp. A frozen or broken feed can return 0, and a misconfigured one can return a negative value. Pricing mints, liquidations, or settlements off that figure without `answer > 0` (or switching to `latestRoundData` with a freshness check) lets the feed print the wrong number.
+
+Flagged:
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
+
+interface AggregatorV2Interface {
+    function latestAnswer() external view returns (int256);
+}
+
+contract Price {
+    AggregatorV2Interface public feed;
+
+    function read() external view returns (int256) {
+        return feed.latestAnswer();
+    }
+}
+```
+
+Fixed:
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
+
+interface AggregatorV2Interface {
+    function latestAnswer() external view returns (int256);
+}
+
+contract Price {
+    AggregatorV2Interface public feed;
+
+    function read() external view returns (int256) {
+        int256 answer = feed.latestAnswer();
+        require(answer > 0, "bad answer");
+        return answer;
+    }
+}
+```

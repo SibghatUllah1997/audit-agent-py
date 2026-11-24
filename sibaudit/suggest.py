@@ -285,6 +285,12 @@ _HINTS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
         "or still within the feed's heartbeat.",
         (),
     ),
+    (
+        "A033",
+        "Require answer > 0 before using latestAnswer, or switch to latestRoundData "
+        "and check that the round is complete or still within the heartbeat.",
+        (),
+    ),
 )
 
 
