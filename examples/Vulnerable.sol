@@ -278,3 +278,23 @@ contract SpotPrice {
         return feed.latestAnswer();
     }
 }
+
+// amountOutMin of 0 lets a sandwich take the whole trade.
+interface IUniswapV2Router {
+    function swapExactTokensForTokens(
+        uint256 amountIn,
+        uint256 amountOutMin,
+        address[] calldata path,
+        address to,
+        uint256 deadline
+    ) external returns (uint256[] memory amounts);
+}
+
+contract Dump {
+    IUniswapV2Router public router;
+
+    function dump(uint256 amountIn, address[] calldata path, uint256 deadline) external {
+        // A034
+        router.swapExactTokensForTokens(amountIn, 0, path, msg.sender, deadline);
+    }
+}

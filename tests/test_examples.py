@@ -165,3 +165,12 @@ def test_sample_contract_flags_unchecked_latest_answer() -> None:
     assert "latestAnswer()" in stale[0].line_text
     assert "answer > 0" in stale[0].message
     assert stale[0].severity == "HIGH"
+
+
+def test_sample_contract_flags_zero_slippage_swap() -> None:
+    findings = scan_paths([str(EXAMPLES)])
+    swaps = [f for f in findings if f.code == "A034"]
+    assert len(swaps) == 1
+    assert "swapExactTokensForTokens" in swaps[0].line_text
+    assert "amountOutMin 0" in swaps[0].message
+    assert swaps[0].severity == "HIGH"
