@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-24
+- Added `--cache FILE` (and `SIBAUDIT_CACHE`) so repeat scans reuse findings for files whose SHA-256 has not changed and only run detectors on edited files.
+- The cache is tied to the version and the rule code, so an upgrade or a rule change starts it fresh; a corrupt or unwritable cache never fails the scan.
+- Marked day 55 complete on the roadmap.
+
 ## 2026-11-23
 - Added rule A032 to flag Chainlink `latestRoundData` when the price is used without `answer > 0` or a round-freshness check.
 - Added `--format junit` so CI can publish each finding as a failed testcase with file and line.

@@ -21,3 +21,6 @@ venv/
 # Mac / OS
 .DS_Store
 
+
+# sibaudit
+.sibaudit-cache.json

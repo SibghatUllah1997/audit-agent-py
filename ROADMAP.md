@@ -69,4 +69,4 @@ Randomness and oracle rules, plus faster repeat scans. Still one shippable step 
 - [x] Day 52: Add rule A031: `block.prevrandao` / `block.difficulty` used as randomness (proposer can bias it)
 - [x] Day 53: Add rule A032: Chainlink `latestRoundData` used without a staleness or `answer > 0` check
 - [x] Day 54: Add `--format junit` so CI dashboards can show findings as failed test cases
-- [ ] Day 55: Cache per-file findings by content hash so repeat scans of large repos skip unchanged files
+- [x] Day 55: Cache per-file findings by content hash so repeat scans of large repos skip unchanged files
