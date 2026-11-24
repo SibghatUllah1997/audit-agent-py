@@ -6,6 +6,7 @@ from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from .cache import CachedFinding, ScanCache, content_hash
 from .directives import parse_ignore_file
 from .globs import is_selected
 
@@ -3014,31 +3015,69 @@ def scan_paths(
     paths: Iterable[str],
     include: Sequence[str] | None = None,
     exclude: Sequence[str] | None = None,
+    cache: ScanCache | None = None,
 ) -> list[Finding]:
     root_paths = [Path(p).resolve() for p in paths]
     findings: list[Finding] = []
     for file_path in _iter_solidity_files(root_paths, include, exclude):
         try:
-            content = file_path.read_text(encoding="utf-8", errors="ignore")
-        except Exception:
+            data = file_path.read_bytes()
+        except OSError:
             # Skip unreadable files
             continue
-        lines = content.splitlines()
-        file_ignore = parse_ignore_file(lines)
-        if file_ignore is not None and not file_ignore.codes:
-            # Whole file opted out; skip running any detector.
-            continue
-        file_findings: list[Finding] = []
-        # Build ignore set: for any line containing the directive, ignore the next line index.
-        ignore_next_lines: set[int] = set()
-        for idx, line in enumerate(lines, start=1):
-            if "sibaudit:ignore-next-line" in line:
-                ignore_next_lines.add(idx + 1)
-
-        for detector in _DETECTORS:
-            file_findings.extend(detector(lines, file_path, ignore_next_lines))
-        if file_ignore is not None:
-            file_findings = [f for f in file_findings if not file_ignore.covers(f.code)]
+        digest = content_hash(data) if cache is not None else ""
+        if cache is not None:
+            cached = cache.get(file_path, digest)
+            if cached is not None:
+                findings.extend(_from_cached(file_path, cached))
+                continue
+        file_findings = scan_source(data.decode("utf-8", errors="ignore"), file_path)
+        if cache is not None:
+            cache.put(file_path, digest, [_to_cached(f) for f in file_findings])
         findings.extend(file_findings)
     return findings
 
+
+def scan_source(content: str, file_path: Path) -> list[Finding]:
+    """Run every detector on one file's text and apply its ignore directives."""
+    lines = content.splitlines()
+    file_ignore = parse_ignore_file(lines)
+    if file_ignore is not None and not file_ignore.codes:
+        # Whole file opted out; skip running any detector.
+        return []
+    # Build ignore set: for any line containing the directive, ignore the next line index.
+    ignore_next_lines: set[int] = set()
+    for idx, line in enumerate(lines, start=1):
+        if "sibaudit:ignore-next-line" in line:
+            ignore_next_lines.add(idx + 1)
+
+    file_findings: list[Finding] = []
+    for detector in _DETECTORS:
+        file_findings.extend(detector(lines, file_path, ignore_next_lines))
+    if file_ignore is not None:
+        file_findings = [f for f in file_findings if not file_ignore.covers(f.code)]
+    return file_findings
+
+
+def _to_cached(finding: Finding) -> CachedFinding:
+    return CachedFinding(
+        line_number=finding.line_number,
+        code=finding.code,
+        severity=finding.severity,
+        message=finding.message,
+        line_text=finding.line_text,
+    )
+
+
+def _from_cached(file_path: Path, cached: list[CachedFinding]) -> list[Finding]:
+    return [
+        Finding(
+            file_path=file_path,
+            line_number=c.line_number,
+            code=c.code,
+            severity=c.severity,
+            message=c.message,
+            line_text=c.line_text,
+        )
+        for c in cached
+    ]
