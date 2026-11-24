@@ -156,3 +156,12 @@ def test_sample_contract_flags_unchecked_latest_round() -> None:
     assert "latestRoundData()" in stale[0].line_text
     assert "staleness" in stale[0].message
     assert stale[0].severity == "HIGH"
+
+
+def test_sample_contract_flags_unchecked_latest_answer() -> None:
+    findings = scan_paths([str(EXAMPLES)])
+    stale = [f for f in findings if f.code == "A033"]
+    assert len(stale) == 1
+    assert "latestAnswer()" in stale[0].line_text
+    assert "answer > 0" in stale[0].message
+    assert stale[0].severity == "HIGH"

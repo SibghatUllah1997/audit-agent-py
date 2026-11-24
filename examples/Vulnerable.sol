@@ -264,3 +264,17 @@ contract OraclePrice {
         return answer;
     }
 }
+
+// latestAnswer is a single int256 with no round metadata; a zero figure still prices assets.
+interface AggregatorV2Interface {
+    function latestAnswer() external view returns (int256);
+}
+
+contract SpotPrice {
+    AggregatorV2Interface public feed;
+
+    function read() external view returns (int256) {
+        // A033
+        return feed.latestAnswer();
+    }
+}

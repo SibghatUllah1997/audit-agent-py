@@ -106,6 +106,7 @@ Example output (real):
 /workspace/examples/Vulnerable.sol:234: A029 Unbounded loop over storage array "recipients" in a state-changing function; a long list can run out of gas.
 /workspace/examples/Vulnerable.sol:246: A031 block.prevrandao is known to the block proposer and can be biased; use a VRF or commit-reveal for randomness.
 /workspace/examples/Vulnerable.sol:263: A032 Chainlink latestRoundData() is used without a staleness or answer > 0 check; a frozen or zero round can price assets wrong.
+/workspace/examples/Vulnerable.sol:278: A033 Chainlink latestAnswer() is used without an answer > 0 check; a zero or negative round can price assets wrong.
 ```
 
 Notes
