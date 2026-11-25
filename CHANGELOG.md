@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-25
+- Added rule A035 to flag `permit` calls that pass a literal 0 as the deadline. On EIP-2612 that permit is already expired and always reverts; on DAI-style permit, expiry 0 means the signed approval never expires.
+- Marked day 58 complete on the roadmap.
+
 ## 2026-11-24
 - Added rule A033 to flag Chainlink `latestAnswer` when the price is used without `answer > 0`.
 - Added rule A034 to flag Uniswap-style swaps whose `amountOutMin` is 0, so a sandwich can steal the whole output.

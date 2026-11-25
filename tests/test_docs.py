@@ -327,3 +327,13 @@ def test_latest_answer_and_zero_slippage_are_documented_and_days_56_57_are_done(
         "- [x] Day 57: Add rule A034: Uniswap-style swap with `amountOutMin` / "
         "`amountOutMinimum` of 0 (no slippage)"
     ) in roadmap
+
+
+def test_zero_deadline_permit_is_documented_and_day_58_is_done() -> None:
+    text = README.read_text(encoding="utf-8")
+    assert "| A035 | MEDIUM" in text
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert "## 2026-11-25" in changelog
+    assert "A035" in changelog
+    roadmap = ROADMAP.read_text(encoding="utf-8")
+    assert "- [x] Day 58: Add rule A035: EIP-2612 `permit` called with a zero deadline" in roadmap
