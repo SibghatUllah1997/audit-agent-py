@@ -183,3 +183,12 @@ def test_sample_contract_flags_zero_deadline_permit() -> None:
     assert "token.permit(" in permits[0].line_text
     assert "deadline 0" in permits[0].message
     assert permits[0].severity == "MEDIUM"
+
+
+def test_sample_contract_flags_amm_spot_oracle() -> None:
+    findings = scan_paths([str(EXAMPLES)])
+    spots = [f for f in findings if f.code == "A036"]
+    assert len(spots) == 1
+    assert "pair.getReserves()" in spots[0].line_text
+    assert "flash loan" in spots[0].message
+    assert spots[0].severity == "HIGH"

@@ -112,6 +112,7 @@ Example output (real):
 /workspace/examples/Vulnerable.sol:278: A033 Chainlink latestAnswer() is used without an answer > 0 check; a zero or negative round can price assets wrong.
 /workspace/examples/Vulnerable.sol:298: A034 Uniswap-style swap uses amountOutMin 0, so a sandwich can steal the whole output. Set a minimum the caller is willing to receive.
 /workspace/examples/Vulnerable.sol:320: A035 EIP-2612 permit() is called with deadline 0, which is already expired, so the call always reverts. Pass the deadline the owner signed.
+/workspace/examples/Vulnerable.sol:334: A036 AMM getReserves() is used as a spot price; a flash loan can move the pool in the same transaction. Use a TWAP or a dedicated oracle.
 ```
 
 Notes

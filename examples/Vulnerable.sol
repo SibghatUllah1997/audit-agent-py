@@ -320,3 +320,18 @@ contract PermitPull {
         token.permit(msg.sender, address(this), amount, 0, v, r, s);
     }
 }
+
+// Spot reserves are not an oracle: a flash loan can move them this block.
+interface IUniswapV2Pair {
+    function getReserves() external view returns (uint112, uint112, uint32);
+}
+
+contract SpotOracle {
+    IUniswapV2Pair public pair;
+
+    function price() external view returns (uint112, uint112) {
+        // A036
+        (uint112 r0, uint112 r1,) = pair.getReserves();
+        return (r0, r1);
+    }
+}
