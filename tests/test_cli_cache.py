@@ -65,3 +65,23 @@ def test_config_still_applies_to_cached_findings(tmp_path: Path) -> None:
     warm = _run(tmp_path, "--cache", "c.json", "C.sol")
     assert warm.returncode == 0
     assert "A001" not in warm.stdout
+
+
+def test_stderr_prints_cache_stats_when_flag_used(tmp_path: Path) -> None:
+    (tmp_path / "C.sol").write_text(RISKY + "\n")
+    cold = _run(tmp_path, "--cache", "c.json", "C.sol")
+    assert cold.returncode == 0
+    assert "cache:" in cold.stderr
+    assert "hits" in cold.stderr and "misses" in cold.stderr
+    assert " 0 hits" in cold.stderr and " 1 misses" in cold.stderr
+    warm = _run(tmp_path, "--cache", "c.json", "C.sol")
+    assert warm.returncode == 0
+    assert "cache:" in warm.stderr
+    assert " 1 hits" in warm.stderr and " 0 misses" in warm.stderr
+
+
+def test_no_stats_without_cache_flag(tmp_path: Path) -> None:
+    (tmp_path / "C.sol").write_text(RISKY + "\n")
+    run = _run(tmp_path, "C.sol")
+    assert run.returncode == 0
+    assert "cache:" not in run.stderr
