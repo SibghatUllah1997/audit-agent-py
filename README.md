@@ -47,6 +47,7 @@ Rules
 | A032 | HIGH     | Chainlink `latestRoundData` used without a staleness or `answer > 0` check |
 | A033 | HIGH     | Chainlink `latestAnswer` used without an `answer > 0` check |
 | A034 | HIGH     | Uniswap-style swap with `amountOutMin` of 0 (no slippage) |
+| A035 | MEDIUM   | EIP-2612 `permit` called with a zero deadline |
 
 Install
 - Python 3.11+
@@ -109,6 +110,7 @@ Example output (real):
 /workspace/examples/Vulnerable.sol:263: A032 Chainlink latestRoundData() is used without a staleness or answer > 0 check; a frozen or zero round can price assets wrong.
 /workspace/examples/Vulnerable.sol:278: A033 Chainlink latestAnswer() is used without an answer > 0 check; a zero or negative round can price assets wrong.
 /workspace/examples/Vulnerable.sol:298: A034 Uniswap-style swap uses amountOutMin 0, so a sandwich can steal the whole output. Set a minimum the caller is willing to receive.
+/workspace/examples/Vulnerable.sol:320: A035 EIP-2612 permit() is called with deadline 0, which is already expired, so the call always reverts. Pass the deadline the owner signed.
 ```
 
 Notes

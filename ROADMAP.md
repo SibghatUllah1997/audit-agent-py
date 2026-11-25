@@ -77,5 +77,5 @@ Leftover oracle checks and DeFi swap guards. Same pace: one shippable step per d
 
 - [x] Day 56: Add rule A033: Chainlink `latestAnswer` used without an `answer > 0` check
 - [x] Day 57: Add rule A034: Uniswap-style swap with `amountOutMin` / `amountOutMinimum` of 0 (no slippage)
-- [ ] Day 58: Add rule A035: EIP-2612 `permit` called with a zero deadline
+- [x] Day 58: Add rule A035: EIP-2612 `permit` called with a zero deadline
 - [ ] Day 59: Print cache hit/miss counts to stderr when `--cache` is set
