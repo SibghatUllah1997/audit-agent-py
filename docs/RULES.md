@@ -1412,3 +1412,71 @@ contract Seller {
     }
 }
 ```
+
+## A035: EIP-2612 `permit` called with a zero deadline
+
+Severity: **MEDIUM**
+
+EIP-2612 `permit` reverts once `block.timestamp` passes the deadline, so a hard-coded 0 makes every call fail and the flow that relies on it is dead. On DAI-style `permit` the meaning flips: expiry 0 means the signed approval never expires, so a leaked signature stays usable forever. Pass the deadline or expiry the owner actually signed.
+
+Flagged:
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
+
+interface IERC20Permit {
+    function permit(
+        address owner,
+        address spender,
+        uint256 value,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external;
+}
+
+contract Depositor {
+    IERC20Permit public token;
+
+    function depositWithPermit(uint256 amount, uint8 v, bytes32 r, bytes32 s)
+        external
+    {
+        token.permit(msg.sender, address(this), amount, 0, v, r, s);
+    }
+}
+```
+
+Fixed:
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
+
+interface IERC20Permit {
+    function permit(
+        address owner,
+        address spender,
+        uint256 value,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external;
+}
+
+contract Depositor {
+    IERC20Permit public token;
+
+    function depositWithPermit(
+        uint256 amount,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external {
+        token.permit(msg.sender, address(this), amount, deadline, v, r, s);
+    }
+}
+```

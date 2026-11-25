@@ -1321,6 +1321,54 @@ def _detect_zero_slippage_swap(
             )
 
 
+PERMIT_CALL_PATTERN = re.compile(r"\.\s*permit\s*\(")
+# Argument count -> (position of the deadline, style). EIP-2612 is the
+# 7-arg (v, r, s) form; some tokens add a 5-arg overload with packed
+# signature bytes. The DAI-style permit takes 8 args with ``expiry`` at 3.
+_PERMIT_DEADLINE_SLOTS = {5: (3, "eip2612"), 7: (3, "eip2612"), 8: (3, "dai")}
+
+
+def _detect_zero_deadline_permit(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    # A zero EIP-2612 deadline is already expired, so the call always reverts.
+    # For DAI-style permit, expiry 0 means the signature never expires.
+    messages = {
+        "eip2612": (
+            "EIP-2612 permit() is called with deadline 0, which is already expired, "
+            "so the call always reverts. Pass the deadline the owner signed."
+        ),
+        "dai": (
+            "DAI-style permit() is called with expiry 0, so the signed approval "
+            "never expires and can be submitted at any time. Use a real expiry."
+        ),
+    }
+    for start_line, end_line in _callable_spans(lines):
+        source = _span_source(lines, start_line, end_line)
+        for match in PERMIT_CALL_PATTERN.finditer(source):
+            close_end = _close_paren_end(source, match.end() - 1)
+            if close_end is None:
+                continue
+            line_no = start_line + source[: match.start()].count("\n")
+            if ignore_next_lines and line_no in ignore_next_lines:
+                continue
+            args = _split_top_level_args(source[match.end() : close_end - 1])
+            slot = _PERMIT_DEADLINE_SLOTS.get(len(args))
+            if slot is None:
+                continue
+            index, style = slot
+            if not _is_zero_amount(args[index]):
+                continue
+            yield Finding(
+                file_path=file_path,
+                line_number=line_no,
+                code="A035",
+                severity="MEDIUM",
+                message=messages[style],
+                line_text=lines[line_no - 1].rstrip(),
+            )
+
+
 def _detect_events_missing_critical_params(
     lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
 ) -> Iterator[Finding]:
@@ -3143,6 +3191,7 @@ _DETECTORS = (
     _detect_unchecked_latest_round,
     _detect_unchecked_latest_answer,
     _detect_zero_slippage_swap,
+    _detect_zero_deadline_permit,
 )
 
 

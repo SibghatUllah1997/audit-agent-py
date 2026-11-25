@@ -297,6 +297,16 @@ _HINTS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
         "so a sandwich cannot drain the swap.",
         (),
     ),
+    (
+        "A035",
+        "Pass the deadline the owner signed instead of 0.",
+        (
+            (
+                "DAI-style",
+                "Sign and pass a real expiry; 0 makes the DAI-style permit valid forever.",
+            ),
+        ),
+    ),
 )
 
 
