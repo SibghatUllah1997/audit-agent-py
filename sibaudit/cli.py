@@ -276,6 +276,13 @@ def main(argv: list[str] | None = None) -> None:
         except OSError as exc:
             # A cache we cannot write should never fail the scan itself.
             print(f"warning: cannot write cache file: {exc}", file=sys.stderr)
+        # Only print cache stats when the --cache flag is explicitly set.
+        if isinstance(ns.cache, str) and ns.cache.strip():
+            try:
+                print(cache.format_stats(), file=sys.stderr)
+            except Exception:
+                # Never let stats printing affect scan outcome.
+                pass
     findings = apply_config(findings, config)
     try:
         findings = apply_filters(
