@@ -335,3 +335,22 @@ contract SpotOracle {
         return (r0, r1);
     }
 }
+
+// msg.value inside the loop credits the full payment to every user.
+contract BatchPay {
+    mapping(address => uint256) public credit;
+
+    function depositAll(address[] calldata users) external payable {
+        // A037
+        for (uint256 i = 0; i < users.length; i++) {
+            credit[users[i]] += msg.value;
+        }
+    }
+
+    function withdraw() external {
+        uint256 amount = credit[msg.sender];
+        credit[msg.sender] = 0;
+        (bool ok, ) = msg.sender.call{value: amount}("");
+        require(ok);
+    }
+}

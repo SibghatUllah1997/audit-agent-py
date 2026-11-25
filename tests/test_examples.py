@@ -192,3 +192,12 @@ def test_sample_contract_flags_amm_spot_oracle() -> None:
     assert "pair.getReserves()" in spots[0].line_text
     assert "flash loan" in spots[0].message
     assert spots[0].severity == "HIGH"
+
+
+def test_sample_contract_flags_msg_value_in_loop() -> None:
+    findings = scan_paths([str(EXAMPLES)])
+    loops = [f for f in findings if f.code == "A037"]
+    assert len(loops) == 1
+    assert "msg.value" in loops[0].line_text
+    assert "inside a loop" in loops[0].message
+    assert loops[0].severity == "HIGH"
