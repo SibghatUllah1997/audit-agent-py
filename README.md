@@ -256,6 +256,7 @@ python3 -m sibaudit --cache .sibaudit-cache.json src
 - The cache resets itself when sibaudit is upgraded or a rule changes. A missing or broken cache file just means a normal full scan.
 - Entries for deleted files are dropped on save. If the file cannot be written you get a warning, never a failed scan.
 - If the flag is omitted, `SIBAUDIT_CACHE` is read. On a 300-file folder a warm run went from about 4.5s to 0.15s.
+ - With `--cache`, stderr prints a one-line `cache: H hits, M misses` summary for the run.
 
 Baseline suppression
 
