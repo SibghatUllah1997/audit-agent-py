@@ -174,3 +174,12 @@ def test_sample_contract_flags_zero_slippage_swap() -> None:
     assert "swapExactTokensForTokens" in swaps[0].line_text
     assert "amountOutMin 0" in swaps[0].message
     assert swaps[0].severity == "HIGH"
+
+
+def test_sample_contract_flags_zero_deadline_permit() -> None:
+    findings = scan_paths([str(EXAMPLES)])
+    permits = [f for f in findings if f.code == "A035"]
+    assert len(permits) == 1
+    assert "token.permit(" in permits[0].line_text
+    assert "deadline 0" in permits[0].message
+    assert permits[0].severity == "MEDIUM"

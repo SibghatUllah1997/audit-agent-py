@@ -298,3 +298,25 @@ contract Dump {
         router.swapExactTokensForTokens(amountIn, 0, path, msg.sender, deadline);
     }
 }
+
+// A zero deadline is already expired, so this permit always reverts.
+interface IERC20Permit {
+    function permit(
+        address owner,
+        address spender,
+        uint256 value,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external;
+}
+
+contract PermitPull {
+    IERC20Permit public token;
+
+    function pull(uint256 amount, uint8 v, bytes32 r, bytes32 s) external {
+        // A035
+        token.permit(msg.sender, address(this), amount, 0, v, r, s);
+    }
+}
