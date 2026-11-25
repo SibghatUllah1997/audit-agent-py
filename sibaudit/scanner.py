@@ -1437,6 +1437,82 @@ def _detect_amm_spot_oracle(
             )
 
 
+MSG_VALUE_PATTERN = re.compile(r"\bmsg\.value\b")
+
+
+def _extract_brace_body(text: str, open_index: int) -> str | None:
+    """Return the text inside the ``{...}`` group that starts at ``open_index``."""
+    if open_index >= len(text) or text[open_index] != "{":
+        return None
+    depth = 0
+    for index in range(open_index, len(text)):
+        char = text[index]
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return text[open_index + 1 : index]
+    return None
+
+
+def _loop_body(source: str, header_start: int) -> tuple[int, str] | None:
+    """Body text of the ``for``/``while`` whose keyword starts at ``header_start``."""
+    open_paren = source.find("(", header_start)
+    if open_paren < 0:
+        return None
+    close_end = _close_paren_end(source, open_paren)
+    if close_end is None:
+        return None
+    index = close_end
+    n = len(source)
+    while index < n and source[index] in " \t\n\r":
+        index += 1
+    if index >= n:
+        return None
+    if source[index] == "{":
+        body = _extract_brace_body(source, index)
+        if body is None:
+            return None
+        return index + 1, body
+    semi = source.find(";", index)
+    if semi < 0:
+        return None
+    return index, source[index:semi]
+
+
+def _detect_msg_value_in_loop(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    # Reading msg.value inside a loop credits the same payment on every
+    # iteration. Cache it before the loop, or split it with a per-item amount.
+    message = (
+        "msg.value is read inside a loop, so one payment is counted on every "
+        "iteration. Cache msg.value before the loop or split it with a per-item amount."
+    )
+    for func in _iter_functions(lines, include_constructors=True):
+        source = _function_source(lines, func)
+        for start, _kind, _inner in _iter_loop_headers(source):
+            body_span = _loop_body(source, start)
+            if body_span is None:
+                continue
+            body_index, body = body_span
+            match = MSG_VALUE_PATTERN.search(body)
+            if not match:
+                continue
+            line_no = func.start_line + source[: body_index + match.start()].count("\n")
+            if ignore_next_lines and line_no in ignore_next_lines:
+                continue
+            yield Finding(
+                file_path=file_path,
+                line_number=line_no,
+                code="A037",
+                severity="HIGH",
+                message=message,
+                line_text=lines[line_no - 1].rstrip(),
+            )
+
+
 def _detect_events_missing_critical_params(
     lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
 ) -> Iterator[Finding]:
@@ -3261,6 +3337,7 @@ _DETECTORS = (
     _detect_zero_slippage_swap,
     _detect_zero_deadline_permit,
     _detect_amm_spot_oracle,
+    _detect_msg_value_in_loop,
 )
 
 

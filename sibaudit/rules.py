@@ -1438,6 +1438,52 @@ RULES: tuple[Rule, ...] = (
             """
         ),
     ),
+    Rule(
+        code="A037",
+        severity="HIGH",
+        title="`msg.value` read inside a loop",
+        rationale=(
+            "`msg.value` is the full amount sent with the call. Reading it inside a "
+            "`for` or `while` credits that amount once per iteration, so a batch "
+            "deposit or payout can over-account or send the whole payment to every "
+            "recipient. Cache `msg.value` before the loop, or divide it by the number "
+            "of items and use that share."
+        ),
+        flagged=_sol(
+            """
+            contract Splitter {
+                mapping(address => uint256) public credit;
+
+                function split(address[] calldata users) external payable {
+                    for (uint256 i = 0; i < users.length; i++) {
+                        credit[users[i]] += msg.value;
+                    }
+                }
+            }
+            """
+        ),
+        fixed=_sol(
+            """
+            contract Splitter {
+                mapping(address => uint256) public credit;
+
+                function split(address[] calldata users) external payable {
+                    uint256 share = msg.value / users.length;
+                    for (uint256 i = 0; i < users.length; i++) {
+                        credit[users[i]] += share;
+                    }
+                }
+
+                function withdraw() external {
+                    uint256 amount = credit[msg.sender];
+                    credit[msg.sender] = 0;
+                    (bool ok, ) = msg.sender.call{value: amount}("");
+                    require(ok);
+                }
+            }
+            """
+        ),
+    ),
 )
 
 _BY_CODE = {rule.code: rule for rule in RULES}

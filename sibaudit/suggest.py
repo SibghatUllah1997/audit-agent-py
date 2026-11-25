@@ -317,6 +317,11 @@ _HINTS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
             ),
         ),
     ),
+    (
+        "A037",
+        "Read msg.value once before the loop, or split it into a per-item amount.",
+        (),
+    ),
 )
 
 

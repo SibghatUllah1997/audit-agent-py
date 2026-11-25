@@ -49,6 +49,7 @@ Rules
 | A034 | HIGH     | Uniswap-style swap with `amountOutMin` of 0 (no slippage) |
 | A035 | MEDIUM   | EIP-2612 `permit` called with a zero deadline |
 | A036 | HIGH     | AMM `getReserves` / `slot0` used as a spot-price oracle |
+| A037 | HIGH     | `msg.value` read inside a loop |
 
 Install
 - Python 3.11+
