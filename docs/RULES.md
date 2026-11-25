@@ -1480,3 +1480,50 @@ contract Depositor {
     }
 }
 ```
+
+## A036: AMM `getReserves` / `slot0` used as a spot-price oracle
+
+Severity: **HIGH**
+
+Uniswap V2 `getReserves` and V3 `slot0` return the pool's current balances or tick. Anyone can move those with a flash loan in the same transaction, so using them to price a mint, liquidation, or settlement is not an oracle. Read a TWAP (`observe`) or a dedicated price feed instead. Helpers named `getReserves` / `slot0` / `getAmounts*` and functions that also swap are left alone.
+
+Flagged:
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
+
+interface IUniswapV2Pair {
+    function getReserves() external view returns (uint112, uint112, uint32);
+}
+
+contract Priced {
+    IUniswapV2Pair public pair;
+
+    function price() external view returns (uint112, uint112) {
+        (uint112 reserve0, uint112 reserve1,) = pair.getReserves();
+        return (reserve0, reserve1);
+    }
+}
+```
+
+Fixed:
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
+
+interface IAggregator {
+    function latestAnswer() external view returns (int256);
+}
+
+contract Priced {
+    IAggregator public feed;
+
+    function price() external view returns (int256) {
+        int256 answer = feed.latestAnswer();
+        require(answer > 0, "bad answer");
+        return answer;
+    }
+}
+```

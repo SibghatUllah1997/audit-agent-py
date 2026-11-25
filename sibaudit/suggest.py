@@ -307,6 +307,16 @@ _HINTS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
             ),
         ),
     ),
+    (
+        "A036",
+        "Do not price off getReserves or slot0; use a TWAP (observe) or a dedicated feed.",
+        (
+            (
+                "slot0()",
+                "slot0 is the current tick; use observe() over a window or a dedicated feed.",
+            ),
+        ),
+    ),
 )
 
 

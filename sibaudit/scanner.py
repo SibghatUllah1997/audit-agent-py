@@ -1369,6 +1369,74 @@ def _detect_zero_deadline_permit(
             )
 
 
+SPOT_ORACLE_CALL_PATTERN = re.compile(
+    r"\.\s*(?P<method>getReserves|slot0)\s*\(",
+    re.IGNORECASE,
+)
+# A swap or Uniswap V3 TWAP in the same function is using the pool, not
+# treating the current tick/reserves as an oracle.
+SPOT_ORACLE_SAFE_CALL_PATTERN = re.compile(
+    r"\.\s*(?:"
+    r"swap(?:Exact[A-Za-z]*)?"
+    r"|exactInput(?:Single)?"
+    r"|exactOutput(?:Single)?"
+    r"|observe"
+    r")\s*(?:\{[^}]*\})?\s*\(",
+    re.IGNORECASE,
+)
+SPOT_ORACLE_HELPER_NAMES = frozenset(
+    {
+        "getreserves",
+        "slot0",
+        "getamountin",
+        "getamountout",
+        "getamountsin",
+        "getamountsout",
+    }
+)
+SPOT_ORACLE_MESSAGES = {
+    "getreserves": (
+        "AMM getReserves() is used as a spot price; a flash loan can move the "
+        "pool in the same transaction. Use a TWAP or a dedicated oracle."
+    ),
+    "slot0": (
+        "AMM slot0() is used as a spot price; a flash loan can move the pool "
+        "in the same transaction. Use a TWAP (observe) or a dedicated oracle."
+    ),
+}
+
+
+def _detect_amm_spot_oracle(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    # getReserves / slot0 is the current pool state. Reading it to price a mint,
+    # liquidation, or settlement lets a flash loan move the pool in the same
+    # transaction. A helper named getReserves/slot0/getAmounts*, or a function
+    # that also swaps / calls observe(), is left alone.
+    for func in _iter_functions(lines, include_constructors=True):
+        if func.name.lower() in SPOT_ORACLE_HELPER_NAMES:
+            continue
+        source = _function_source(lines, func)
+        if SPOT_ORACLE_SAFE_CALL_PATTERN.search(source):
+            continue
+        for match in SPOT_ORACLE_CALL_PATTERN.finditer(source):
+            close_end = _close_paren_end(source, match.end() - 1)
+            if close_end is None:
+                continue
+            line_no = func.start_line + source[: match.start()].count("\n")
+            if ignore_next_lines and line_no in ignore_next_lines:
+                continue
+            method = match.group("method").lower()
+            yield Finding(
+                file_path=file_path,
+                line_number=line_no,
+                code="A036",
+                severity="HIGH",
+                message=SPOT_ORACLE_MESSAGES[method],
+                line_text=lines[line_no - 1].rstrip(),
+            )
+
+
 def _detect_events_missing_critical_params(
     lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
 ) -> Iterator[Finding]:
@@ -3192,6 +3260,7 @@ _DETECTORS = (
     _detect_unchecked_latest_answer,
     _detect_zero_slippage_swap,
     _detect_zero_deadline_permit,
+    _detect_amm_spot_oracle,
 )
 
 

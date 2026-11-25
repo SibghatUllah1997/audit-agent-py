@@ -48,6 +48,7 @@ Rules
 | A033 | HIGH     | Chainlink `latestAnswer` used without an `answer > 0` check |
 | A034 | HIGH     | Uniswap-style swap with `amountOutMin` of 0 (no slippage) |
 | A035 | MEDIUM   | EIP-2612 `permit` called with a zero deadline |
+| A036 | HIGH     | AMM `getReserves` / `slot0` used as a spot-price oracle |
 
 Install
 - Python 3.11+
