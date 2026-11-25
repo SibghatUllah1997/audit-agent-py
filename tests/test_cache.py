@@ -168,3 +168,10 @@ def test_file_ignore_directive_is_cached_as_empty(tmp_path: Path) -> None:
     cache = ScanCache.load(tmp_path / "cache.json", key="k")
     assert scan_paths([str(sol)], cache=cache) == []
     assert cache.hits == 1
+
+
+def test_cache_format_stats_string(tmp_path: Path) -> None:
+    c = ScanCache.load(tmp_path / "c.json", key="k")
+    assert c.format_stats() == "cache: 0 hits, 0 misses"
+    c.hits, c.misses = 3, 1
+    assert c.format_stats() == "cache: 3 hits, 1 misses"

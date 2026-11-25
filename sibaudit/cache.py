@@ -119,5 +119,9 @@ class ScanCache:
         self._dirty = False
 
 
+    def format_stats(self) -> str:
+        """Human-friendly summary of cache effectiveness for this run."""
+        return f"cache: {self.hits} hits, {self.misses} misses"
+\
 def _key_for(file_path: Path) -> str:
     return str(file_path.resolve())
