@@ -77,5 +77,14 @@ Leftover oracle checks and DeFi swap guards. Same pace: one shippable step per d
 
 - [x] Day 56: Add rule A033: Chainlink `latestAnswer` used without an `answer > 0` check
 - [x] Day 57: Add rule A034: Uniswap-style swap with `amountOutMin` / `amountOutMinimum` of 0 (no slippage)
- - [x] Day 58: Add rule A035: EIP-2612 `permit` called with a zero deadline
+- [x] Day 58: Add rule A035: EIP-2612 `permit` called with a zero deadline
 - [x] Day 59: Print cache hit/miss counts to stderr when `--cache` is set
+
+# Phase 6
+
+Spot-price oracles and payable-loop bugs. Same pace: one shippable step per day, heuristic and dependency-free.
+
+- [x] Day 60: Add rule A036: AMM `getReserves` / `slot0` used as a spot-price oracle
+- [x] Day 61: Add rule A037: `msg.value` read inside a loop
+- [ ] Day 62: Add rule A038: Uniswap-style swap with `deadline` of 0
+- [ ] Day 63: Add rule A039: `balanceOf(address(this))` used as the amount received after a transfer

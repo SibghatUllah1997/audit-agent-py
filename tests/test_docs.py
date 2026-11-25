@@ -337,3 +337,20 @@ def test_zero_deadline_permit_is_documented_and_day_58_is_done() -> None:
     assert "A035" in changelog
     roadmap = ROADMAP.read_text(encoding="utf-8")
     assert "- [x] Day 58: Add rule A035: EIP-2612 `permit` called with a zero deadline" in roadmap
+
+
+def test_spot_oracle_and_msg_value_loop_are_documented_and_days_60_61_are_done() -> None:
+    text = README.read_text(encoding="utf-8")
+    assert "| A036 | HIGH" in text
+    assert "| A037 | HIGH" in text
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert "## 2026-11-25" in changelog
+    assert "A036" in changelog
+    assert "A037" in changelog
+    roadmap = ROADMAP.read_text(encoding="utf-8")
+    assert "# Phase 6" in roadmap
+    assert (
+        "- [x] Day 60: Add rule A036: AMM `getReserves` / `slot0` used as a "
+        "spot-price oracle"
+    ) in roadmap
+    assert "- [x] Day 61: Add rule A037: `msg.value` read inside a loop" in roadmap

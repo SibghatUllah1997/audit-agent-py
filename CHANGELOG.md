@@ -1,6 +1,11 @@
 # Changelog
 
 ## 2026-11-25
+- Added rule A036 to flag Uniswap-style `getReserves` and `slot0` reads used as a spot price, which a flash loan can move in the same transaction.
+- Added rule A037 to flag `msg.value` inside a `for`/`while` loop, where one payment is credited on every iteration.
+- Planned phase 6 on the roadmap (days 60-63) and marked days 60 and 61 complete.
+
+## 2026-11-25
 - Added rule A035 to flag `permit` calls that pass a literal 0 as the deadline. On EIP-2612 that permit is already expired and always reverts; on DAI-style permit, expiry 0 means the signed approval never expires.
 - Marked day 58 complete on the roadmap.
 - When `--cache` is used, sibaudit now prints a one-line `cache: H hits, M misses` summary to stderr after the scan.
