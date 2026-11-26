@@ -364,3 +364,16 @@ def test_zero_deadline_swap_is_documented_and_day_62_is_done() -> None:
     assert "A038" in changelog
     roadmap = ROADMAP.read_text(encoding="utf-8")
     assert "- [x] Day 62: Add rule A038: Uniswap-style swap with `deadline` of 0" in roadmap
+
+
+def test_balance_of_this_is_documented_and_day_63_is_done() -> None:
+    text = README.read_text(encoding="utf-8")
+    assert "| A039 | HIGH" in text
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert "## 2026-11-26" in changelog
+    assert "A039" in changelog
+    roadmap = ROADMAP.read_text(encoding="utf-8")
+    assert (
+        "- [x] Day 63: Add rule A039: `balanceOf(address(this))` used as the "
+        "amount received after a transfer"
+    ) in roadmap

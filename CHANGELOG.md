@@ -1,6 +1,11 @@
 # Changelog
 
 ## 2026-11-26
+- Added rule A039 to flag `balanceOf(address(this))` used as the amount just received after a token pull, which a donation can inflate.
+- `safeTransferFrom` and `balanceOf(this)` count too; a before/after snapshot that is subtracted stays quiet.
+- Marked day 63 complete on the roadmap.
+
+## 2026-11-26
 - Added rule A038 to flag Uniswap-style swaps that pass a literal 0 as the deadline. V2 routers and the V3 SwapRouter require `deadline >= block.timestamp`, so that swap always reverts. V3 params are checked both inline and when built before the call.
 ## 2026-11-25
 - Added rule A036 to flag Uniswap-style `getReserves` and `slot0` reads used as a spot price, which a flash loan can move in the same transaction.
