@@ -118,6 +118,7 @@ Example output (real):
 /workspace/examples/Vulnerable.sol:334: A036 AMM getReserves() is used as a spot price; a flash loan can move the pool in the same transaction. Use a TWAP or a dedicated oracle.
 /workspace/examples/Vulnerable.sol:346: A037 msg.value is read inside a loop, so one payment is counted on every iteration. Cache msg.value before the loop or split it with a per-item amount.
 /workspace/examples/Vulnerable.sol:364: A038 Uniswap-style swap passes deadline 0, which is already expired, so the router always reverts. Pass a real deadline the caller chose.
+/workspace/examples/Vulnerable.sol:381: A039 balanceOf(address(this)) is used as the amount received after a transferFrom; a donation can inflate it. Use the pulled amount or the balance delta.
 ```
 
 Notes

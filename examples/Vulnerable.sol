@@ -364,3 +364,21 @@ contract StaleSwap {
         router.swapExactTokensForTokens(amountIn, minOut, path, msg.sender, 0);
     }
 }
+
+// The whole token balance is not the amount just pulled; a donation inflates it.
+interface IERC20Pull {
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+    function balanceOf(address account) external view returns (uint256);
+}
+
+contract VaultDeposit {
+    IERC20Pull public token;
+    mapping(address => uint256) public credit;
+
+    function deposit(uint256 amount) external {
+        require(token.transferFrom(msg.sender, address(this), amount), "pull failed");
+        // A039
+        uint256 received = token.balanceOf(address(this));
+        credit[msg.sender] += received;
+    }
+}

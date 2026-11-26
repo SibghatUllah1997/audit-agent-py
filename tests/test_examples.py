@@ -210,3 +210,12 @@ def test_sample_contract_flags_zero_deadline_swap() -> None:
     assert "minOut, path, msg.sender, 0)" in swaps[0].line_text
     assert "deadline 0" in swaps[0].message
     assert swaps[0].severity == "MEDIUM"
+
+
+def test_sample_contract_flags_balance_of_this_as_received() -> None:
+    findings = scan_paths([str(EXAMPLES)])
+    pulls = [f for f in findings if f.code == "A039"]
+    assert len(pulls) == 1
+    assert "balanceOf(address(this))" in pulls[0].line_text
+    assert "donation" in pulls[0].message
+    assert pulls[0].severity == "HIGH"
