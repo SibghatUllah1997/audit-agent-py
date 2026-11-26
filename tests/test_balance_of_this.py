@@ -8,6 +8,7 @@ from sibaudit.suggest import hint_for
 TOKEN = (
     "interface IERC20 {\n"
     "    function transferFrom(address from, address to, uint256 amount) external returns (bool);\n"
+    "    function safeTransferFrom(address from, address to, uint256 amount) external;\n"
     "    function transfer(address to, uint256 amount) external returns (bool);\n"
     "    function balanceOf(address account) external view returns (uint256);\n"
     "}\n"
@@ -60,6 +61,20 @@ def test_flags_multiline_cast_receiver(tmp_path: Path) -> None:
     findings = _scan(tmp_path, _contract(body))
     assert len(findings) == 1
     assert "balanceOf(address(this))" in findings[0].line_text
+
+
+def test_flags_safe_transfer_from_and_bare_this(tmp_path: Path) -> None:
+    body = (
+        "IERC20 public token;\n"
+        "mapping(address => uint256) public credit;\n"
+        "function deposit(uint256 amount) external {\n"
+        "    token.safeTransferFrom(msg.sender, address(this), amount);\n"
+        "    credit[msg.sender] += token.balanceOf(this);\n"
+        "}\n"
+    )
+    findings = _scan(tmp_path, _contract(body))
+    assert len(findings) == 1
+    assert "balanceOf(this)" in findings[0].line_text
 
 
 def test_transfer_amount_is_clean(tmp_path: Path) -> None:

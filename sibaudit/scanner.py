@@ -1443,11 +1443,11 @@ def _detect_zero_deadline_swap(
 
 
 INBOUND_TRANSFER_FROM_PATTERN = re.compile(
-    r"\.\s*transferFrom\s*(?:\{[^}]*\})?\s*\(",
+    r"\.\s*(?:safe)?transferFrom\s*(?:\{[^}]*\})?\s*\(",
     re.IGNORECASE,
 )
 BALANCE_OF_THIS_PATTERN = re.compile(
-    r"\.\s*balanceOf\s*\(\s*address\s*\(\s*this\s*\)\s*\)",
+    r"\.\s*balanceOf\s*\(\s*(?:address\s*\(\s*this\s*\)|this)\s*\)",
     re.IGNORECASE,
 )
 THIS_ADDRESS_COMPACT = frozenset({"address(this)", "this"})
@@ -1500,7 +1500,7 @@ def _expr_is_subtracted(text: str, start: int, end: int) -> bool:
 
 
 def _inbound_transfer_from_ends(source: str) -> list[int]:
-    """End offsets of ``transferFrom`` whose recipient is this contract."""
+    """End offsets of ``transferFrom`` / ``safeTransferFrom`` whose recipient is this contract."""
     ends: list[int] = []
     for match in INBOUND_TRANSFER_FROM_PATTERN.finditer(source):
         close_end = _close_paren_end(source, match.end() - 1)
