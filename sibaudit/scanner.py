@@ -1427,8 +1427,9 @@ def _detect_zero_deadline_swap(
                 continue
             if _v3_literal_has_zero_deadline(source[match.end() : close_end]):
                 hits.add(match.start())
-        for offset in sorted(hits):
-            line_no = start_line + source[:offset].count("\n")
+        # An inline params literal hits both loops on the same line; report once.
+        hit_lines = {start_line + source[:offset].count("\n") for offset in hits}
+        for line_no in sorted(hit_lines):
             if ignore_next_lines and line_no in ignore_next_lines:
                 continue
             yield Finding(
