@@ -86,5 +86,5 @@ Spot-price oracles and payable-loop bugs. Same pace: one shippable step per day,
 
 - [x] Day 60: Add rule A036: AMM `getReserves` / `slot0` used as a spot-price oracle
 - [x] Day 61: Add rule A037: `msg.value` read inside a loop
-- [ ] Day 62: Add rule A038: Uniswap-style swap with `deadline` of 0
+- [x] Day 62: Add rule A038: Uniswap-style swap with `deadline` of 0
 - [ ] Day 63: Add rule A039: `balanceOf(address(this))` used as the amount received after a transfer
