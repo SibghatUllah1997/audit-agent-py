@@ -1642,3 +1642,58 @@ contract Seller {
     }
 }
 ```
+
+## A039: `balanceOf(address(this))` used as the amount received after a transfer
+
+Severity: **HIGH**
+
+After `transferFrom` into this contract, `balanceOf(address(this))` is the whole token balance, not what this call just pulled. Anyone can donate tokens first and inflate that figure, which then mints too many shares or credits the donor's balance. Use the transfer amount, or snapshot the balance before the pull and subtract.
+
+Flagged:
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
+
+interface IERC20 {
+    function transferFrom(address from, address to, uint256 amount)
+        external
+        returns (bool);
+    function balanceOf(address account) external view returns (uint256);
+}
+
+contract Vault {
+    IERC20 public token;
+    mapping(address => uint256) public credit;
+
+    function deposit(uint256 amount) external {
+        require(token.transferFrom(msg.sender, address(this), amount), "pull");
+        uint256 received = token.balanceOf(address(this));
+        credit[msg.sender] += received;
+    }
+}
+```
+
+Fixed:
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
+
+interface IERC20 {
+    function transferFrom(address from, address to, uint256 amount)
+        external
+        returns (bool);
+    function balanceOf(address account) external view returns (uint256);
+}
+
+contract Vault {
+    IERC20 public token;
+    mapping(address => uint256) public credit;
+
+    function deposit(uint256 amount) external {
+        require(token.transferFrom(msg.sender, address(this), amount), "pull");
+        credit[msg.sender] += amount;
+    }
+}
+```

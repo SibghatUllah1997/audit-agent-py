@@ -1442,6 +1442,114 @@ def _detect_zero_deadline_swap(
             )
 
 
+INBOUND_TRANSFER_FROM_PATTERN = re.compile(
+    r"\.\s*transferFrom\s*(?:\{[^}]*\})?\s*\(",
+    re.IGNORECASE,
+)
+BALANCE_OF_THIS_PATTERN = re.compile(
+    r"\.\s*balanceOf\s*\(\s*address\s*\(\s*this\s*\)\s*\)",
+    re.IGNORECASE,
+)
+THIS_ADDRESS_COMPACT = frozenset({"address(this)", "this"})
+
+
+def _compact_ident(text: str) -> str:
+    return re.sub(r"\s+", "", text.strip()).lower()
+
+
+def _is_this_account(text: str) -> bool:
+    return _compact_ident(text) in THIS_ADDRESS_COMPACT
+
+
+def _expr_is_relational(text: str, start: int, end: int) -> bool:
+    """True if ``text[start:end]`` sits next to ``==``, ``!=``, ``>=``, ``<=``, ``>``, or ``<``."""
+    i = end
+    n = len(text)
+    while i < n and text[i] in WS_CHARS:
+        i += 1
+    for op in CMP_OPS:
+        if text.startswith(op, i):
+            return True
+    i = start
+    while i > 0 and text[i - 1] in WS_CHARS:
+        i -= 1
+    for op in CMP_OPS:
+        if i >= len(op) and text[i - len(op) : i] == op:
+            return True
+    return False
+
+
+def _expr_is_subtracted(text: str, start: int, end: int) -> bool:
+    """True if ``text[start:end]`` is a minuend or subtrahend of ``-`` (not ``-=`` / ``--``)."""
+    i = end
+    n = len(text)
+    while i < n and text[i] in WS_CHARS:
+        i += 1
+    if i < n and text[i] == "-" and not text.startswith("-=", i) and not text.startswith("--", i):
+        return True
+    i = start
+    while i > 0 and text[i - 1] in WS_CHARS:
+        i -= 1
+    if i > 0 and text[i - 1] == "-":
+        if i >= 2 and text[i - 2] == "-":
+            return False
+        if i >= 2 and text[i - 2] == "=":
+            return False
+        return True
+    return False
+
+
+def _inbound_transfer_from_ends(source: str) -> list[int]:
+    """End offsets of ``transferFrom`` whose recipient is this contract."""
+    ends: list[int] = []
+    for match in INBOUND_TRANSFER_FROM_PATTERN.finditer(source):
+        close_end = _close_paren_end(source, match.end() - 1)
+        if close_end is None:
+            continue
+        args = _split_top_level_args(source[match.end() : close_end - 1])
+        if len(args) < 3 or not _is_this_account(args[1]):
+            continue
+        ends.append(close_end)
+    return ends
+
+
+def _detect_balance_of_this_as_received(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    # After pulling tokens in, the contract's whole balance is not "what we just
+    # received": a donation beforehand inflates it. Measure the delta, or use
+    # the transfer amount.
+    message = (
+        "balanceOf(address(this)) is used as the amount received after a "
+        "transferFrom; a donation can inflate it. Use the pulled amount or "
+        "the balance delta."
+    )
+    for start_line, end_line in _callable_spans(lines):
+        source = _span_source(lines, start_line, end_line)
+        inbound_ends = _inbound_transfer_from_ends(source)
+        if not inbound_ends:
+            continue
+        first_inbound = min(inbound_ends)
+        for match in BALANCE_OF_THIS_PATTERN.finditer(source):
+            if match.start() < first_inbound:
+                continue
+            if _expr_is_subtracted(source, match.start(), match.end()):
+                continue
+            if _expr_is_relational(source, match.start(), match.end()):
+                continue
+            line_no = start_line + source[: match.start()].count("\n")
+            if ignore_next_lines and line_no in ignore_next_lines:
+                continue
+            yield Finding(
+                file_path=file_path,
+                line_number=line_no,
+                code="A039",
+                severity="HIGH",
+                message=message,
+                line_text=lines[line_no - 1].rstrip(),
+            )
+
+
 SPOT_ORACLE_CALL_PATTERN = re.compile(
     r"\.\s*(?P<method>getReserves|slot0)\s*\(",
     re.IGNORECASE,
@@ -3412,6 +3520,7 @@ _DETECTORS = (
     _detect_amm_spot_oracle,
     _detect_msg_value_in_loop,
     _detect_zero_deadline_swap,
+    _detect_balance_of_this_as_received,
 )
 
 

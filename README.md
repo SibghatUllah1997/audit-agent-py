@@ -51,6 +51,7 @@ Rules
 | A036 | HIGH     | AMM `getReserves` / `slot0` used as a spot-price oracle |
 | A037 | HIGH     | `msg.value` read inside a loop |
 | A038 | MEDIUM   | Uniswap-style swap with `deadline` of 0 |
+| A039 | HIGH     | `balanceOf(address(this))` used as the amount received after a transfer |
 
 Install
 - Python 3.11+

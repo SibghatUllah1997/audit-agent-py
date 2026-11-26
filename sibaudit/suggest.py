@@ -327,6 +327,11 @@ _HINTS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
         "Pass the deadline the caller chose instead of 0; the router reverts once it has passed.",
         (),
     ),
+    (
+        "A039",
+        "Credit the transfer amount, or snapshot balanceOf before the pull and subtract.",
+        (),
+    ),
 )
 
 
