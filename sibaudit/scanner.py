@@ -1513,6 +1513,45 @@ def _inbound_transfer_from_ends(source: str) -> list[int]:
     return ends
 
 
+def _names_assigned_from_balance_of_this(source: str) -> set[str]:
+    """Locals whose initializer is a ``balanceOf(address(this))`` call."""
+    names: set[str] = set()
+    for match in NAME_ASSIGN_PATTERN.finditer(source):
+        if BALANCE_OF_THIS_PATTERN.search(match.group("value")):
+            names.add(match.group("name"))
+    return names
+
+
+def _assigned_name_for_balance(source: str, start: int, end: int) -> str | None:
+    """Variable assigned from the ``balanceOf`` call at ``[start:end]``, if any."""
+    for match in NAME_ASSIGN_PATTERN.finditer(source):
+        value_start = match.start("value")
+        value_end = match.end("value")
+        if value_start <= start and end <= value_end:
+            return match.group("name")
+    return None
+
+
+def _two_variable_delta_names(source: str) -> set[str]:
+    """Names subtracted from each other when both came from ``balanceOf(this)``."""
+    names = _names_assigned_from_balance_of_this(source)
+    if len(names) < 2:
+        return set()
+    used: set[str] = set()
+    for left in names:
+        for right in names:
+            if left == right:
+                continue
+            pattern = re.compile(
+                rf"(?<![A-Za-z0-9_]){re.escape(left)}(?![A-Za-z0-9_])\s*-\s*"
+                rf"(?<![A-Za-z0-9_]){re.escape(right)}(?![A-Za-z0-9_])"
+            )
+            if pattern.search(source):
+                used.add(left)
+                used.add(right)
+    return used
+
+
 def _detect_balance_of_this_as_received(
     lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
 ) -> Iterator[Finding]:
@@ -1530,12 +1569,16 @@ def _detect_balance_of_this_as_received(
         if not inbound_ends:
             continue
         first_inbound = min(inbound_ends)
+        delta_names = _two_variable_delta_names(source)
         for match in BALANCE_OF_THIS_PATTERN.finditer(source):
             if match.start() < first_inbound:
                 continue
             if _expr_is_subtracted(source, match.start(), match.end()):
                 continue
             if _expr_is_relational(source, match.start(), match.end()):
+                continue
+            assigned = _assigned_name_for_balance(source, match.start(), match.end())
+            if assigned is not None and assigned in delta_names:
                 continue
             line_no = start_line + source[: match.start()].count("\n")
             if ignore_next_lines and line_no in ignore_next_lines:

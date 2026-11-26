@@ -103,6 +103,20 @@ def test_balance_delta_is_clean(tmp_path: Path) -> None:
     assert not _scan(tmp_path, _contract(body))
 
 
+def test_two_variable_delta_is_clean(tmp_path: Path) -> None:
+    body = (
+        "IERC20 public token;\n"
+        "mapping(address => uint256) public credit;\n"
+        "function deposit(uint256 amount) external {\n"
+        "    uint256 before = token.balanceOf(address(this));\n"
+        "    require(token.transferFrom(msg.sender, address(this), amount), \"pull\");\n"
+        "    uint256 afterBal = token.balanceOf(address(this));\n"
+        "    credit[msg.sender] += afterBal - before;\n"
+        "}\n"
+    )
+    assert not _scan(tmp_path, _contract(body))
+
+
 def test_balance_check_comparison_is_clean(tmp_path: Path) -> None:
     body = (
         "IERC20 public token;\n"
