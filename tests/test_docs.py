@@ -354,3 +354,13 @@ def test_spot_oracle_and_msg_value_loop_are_documented_and_days_60_61_are_done()
         "spot-price oracle"
     ) in roadmap
     assert "- [x] Day 61: Add rule A037: `msg.value` read inside a loop" in roadmap
+
+
+def test_zero_deadline_swap_is_documented_and_day_62_is_done() -> None:
+    text = README.read_text(encoding="utf-8")
+    assert "| A038 | MEDIUM" in text
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert "## 2026-11-26" in changelog
+    assert "A038" in changelog
+    roadmap = ROADMAP.read_text(encoding="utf-8")
+    assert "- [x] Day 62: Add rule A038: Uniswap-style swap with `deadline` of 0" in roadmap

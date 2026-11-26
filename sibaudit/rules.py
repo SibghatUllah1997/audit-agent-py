@@ -1484,6 +1484,71 @@ RULES: tuple[Rule, ...] = (
             """
         ),
     ),
+    Rule(
+        code="A038",
+        severity="MEDIUM",
+        title="Uniswap-style swap with `deadline` of 0",
+        rationale=(
+            "Uniswap V2 routers and the V3 `SwapRouter` revert unless "
+            "`deadline >= block.timestamp`. A hard-coded 0 is already in the past, so "
+            "every swap through that path reverts and the feature built on it is dead. "
+            "Take the deadline from the caller (or derive one that still bounds how long "
+            "the transaction can sit in the mempool)."
+        ),
+        flagged=_sol(
+            """
+            interface IUniswapV2Router {
+                function swapExactTokensForTokens(
+                    uint256 amountIn,
+                    uint256 amountOutMin,
+                    address[] calldata path,
+                    address to,
+                    uint256 deadline
+                ) external returns (uint256[] memory amounts);
+            }
+
+            contract Seller {
+                IUniswapV2Router public router;
+
+                function sell(
+                    uint256 amountIn,
+                    uint256 amountOutMin,
+                    address[] calldata path
+                ) external {
+                    router.swapExactTokensForTokens(amountIn, amountOutMin, path, msg.sender, 0);
+                }
+            }
+            """
+        ),
+        fixed=_sol(
+            """
+            interface IUniswapV2Router {
+                function swapExactTokensForTokens(
+                    uint256 amountIn,
+                    uint256 amountOutMin,
+                    address[] calldata path,
+                    address to,
+                    uint256 deadline
+                ) external returns (uint256[] memory amounts);
+            }
+
+            contract Seller {
+                IUniswapV2Router public router;
+
+                function sell(
+                    uint256 amountIn,
+                    uint256 amountOutMin,
+                    address[] calldata path,
+                    uint256 deadline
+                ) external {
+                    router.swapExactTokensForTokens(
+                        amountIn, amountOutMin, path, msg.sender, deadline
+                    );
+                }
+            }
+            """
+        ),
+    ),
 )
 
 _BY_CODE = {rule.code: rule for rule in RULES}

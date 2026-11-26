@@ -1369,6 +1369,79 @@ def _detect_zero_deadline_permit(
             )
 
 
+SWAP_DEADLINE_CALL_PATTERN = re.compile(
+    r"\.\s*(?P<method>"
+    r"swap(?:Exact)?(?:Tokens|ETH)For(?:Exact)?(?:Tokens|ETH)"
+    r"(?:SupportingFeeOnTransferTokens)?"
+    r"|exactInput(?:Single)?"
+    r"|exactOutput(?:Single)?"
+    r")\s*(?:\{[^}]*\})?\s*\(",
+    re.IGNORECASE,
+)
+# V3 params are often built on their own line before the router call.
+SWAP_PARAMS_LITERAL_PATTERN = re.compile(
+    r"\bExact(?:Input|Output)(?:Single)?Params\s*(?P<open>\()\s*\{",
+    re.IGNORECASE,
+)
+DEADLINE_FIELD_PATTERN = re.compile(
+    r"\bdeadline\s*:\s*(?P<value>[^,}\n]+)",
+    re.IGNORECASE,
+)
+
+
+def _v3_literal_has_zero_deadline(text: str) -> bool:
+    field = DEADLINE_FIELD_PATTERN.search(text)
+    return bool(field and _is_zero_amount(field.group("value")))
+
+
+def _detect_zero_deadline_swap(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    # Uniswap V2 routers and the V3 SwapRouter require
+    # deadline >= block.timestamp, so a literal 0 is already expired and the
+    # swap always reverts. V2 takes the deadline as the last argument; V3
+    # takes it as a field on the params struct.
+    message = (
+        "Uniswap-style swap passes deadline 0, which is already expired, so the "
+        "router always reverts. Pass a real deadline the caller chose."
+    )
+    for start_line, end_line in _callable_spans(lines):
+        source = _span_source(lines, start_line, end_line)
+        hits: set[int] = set()
+        for match in SWAP_DEADLINE_CALL_PATTERN.finditer(source):
+            close_end = _close_paren_end(source, match.end() - 1)
+            if close_end is None:
+                continue
+            args_text = source[match.end() : close_end - 1]
+            method = match.group("method").lower()
+            if method.startswith("exact"):
+                flagged = _v3_literal_has_zero_deadline(args_text)
+            else:
+                args = _split_top_level_args(args_text)
+                flagged = len(args) in (4, 5) and _is_zero_amount(args[-1])
+            if flagged:
+                hits.add(match.start())
+        for match in SWAP_PARAMS_LITERAL_PATTERN.finditer(source):
+            close_end = _close_paren_end(source, match.start("open"))
+            if close_end is None:
+                continue
+            if _v3_literal_has_zero_deadline(source[match.end() : close_end]):
+                hits.add(match.start())
+        # An inline params literal hits both loops on the same line; report once.
+        hit_lines = {start_line + source[:offset].count("\n") for offset in hits}
+        for line_no in sorted(hit_lines):
+            if ignore_next_lines and line_no in ignore_next_lines:
+                continue
+            yield Finding(
+                file_path=file_path,
+                line_number=line_no,
+                code="A038",
+                severity="MEDIUM",
+                message=message,
+                line_text=lines[line_no - 1].rstrip(),
+            )
+
+
 SPOT_ORACLE_CALL_PATTERN = re.compile(
     r"\.\s*(?P<method>getReserves|slot0)\s*\(",
     re.IGNORECASE,
@@ -3338,6 +3411,7 @@ _DETECTORS = (
     _detect_zero_deadline_permit,
     _detect_amm_spot_oracle,
     _detect_msg_value_in_loop,
+    _detect_zero_deadline_swap,
 )
 
 

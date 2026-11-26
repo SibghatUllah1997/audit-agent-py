@@ -354,3 +354,13 @@ contract BatchPay {
         require(ok);
     }
 }
+
+// A deadline of 0 is already past, so the router rejects every swap.
+contract StaleSwap {
+    IUniswapV2Router public router;
+
+    function sell(uint256 amountIn, uint256 minOut, address[] calldata path) external {
+        // A038
+        router.swapExactTokensForTokens(amountIn, minOut, path, msg.sender, 0);
+    }
+}

@@ -201,3 +201,12 @@ def test_sample_contract_flags_msg_value_in_loop() -> None:
     assert "msg.value" in loops[0].line_text
     assert "inside a loop" in loops[0].message
     assert loops[0].severity == "HIGH"
+
+
+def test_sample_contract_flags_zero_deadline_swap() -> None:
+    findings = scan_paths([str(EXAMPLES)])
+    swaps = [f for f in findings if f.code == "A038"]
+    assert len(swaps) == 1
+    assert "minOut, path, msg.sender, 0)" in swaps[0].line_text
+    assert "deadline 0" in swaps[0].message
+    assert swaps[0].severity == "MEDIUM"
