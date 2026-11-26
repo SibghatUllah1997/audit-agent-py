@@ -50,6 +50,7 @@ Rules
 | A035 | MEDIUM   | EIP-2612 `permit` called with a zero deadline |
 | A036 | HIGH     | AMM `getReserves` / `slot0` used as a spot-price oracle |
 | A037 | HIGH     | `msg.value` read inside a loop |
+| A038 | MEDIUM   | Uniswap-style swap with `deadline` of 0 |
 
 Install
 - Python 3.11+

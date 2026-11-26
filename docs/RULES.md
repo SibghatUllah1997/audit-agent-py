@@ -1575,3 +1575,70 @@ contract Splitter {
     }
 }
 ```
+
+## A038: Uniswap-style swap with `deadline` of 0
+
+Severity: **MEDIUM**
+
+Uniswap V2 routers and the V3 `SwapRouter` revert unless `deadline >= block.timestamp`. A hard-coded 0 is already in the past, so every swap through that path reverts and the feature built on it is dead. Take the deadline from the caller (or derive one that still bounds how long the transaction can sit in the mempool).
+
+Flagged:
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
+
+interface IUniswapV2Router {
+    function swapExactTokensForTokens(
+        uint256 amountIn,
+        uint256 amountOutMin,
+        address[] calldata path,
+        address to,
+        uint256 deadline
+    ) external returns (uint256[] memory amounts);
+}
+
+contract Seller {
+    IUniswapV2Router public router;
+
+    function sell(
+        uint256 amountIn,
+        uint256 amountOutMin,
+        address[] calldata path
+    ) external {
+        router.swapExactTokensForTokens(amountIn, amountOutMin, path, msg.sender, 0);
+    }
+}
+```
+
+Fixed:
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
+
+interface IUniswapV2Router {
+    function swapExactTokensForTokens(
+        uint256 amountIn,
+        uint256 amountOutMin,
+        address[] calldata path,
+        address to,
+        uint256 deadline
+    ) external returns (uint256[] memory amounts);
+}
+
+contract Seller {
+    IUniswapV2Router public router;
+
+    function sell(
+        uint256 amountIn,
+        uint256 amountOutMin,
+        address[] calldata path,
+        uint256 deadline
+    ) external {
+        router.swapExactTokensForTokens(
+            amountIn, amountOutMin, path, msg.sender, deadline
+        );
+    }
+}
+```

@@ -322,6 +322,11 @@ _HINTS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
         "Read msg.value once before the loop, or split it into a per-item amount.",
         (),
     ),
+    (
+        "A038",
+        "Pass the deadline the caller chose instead of 0; the router reverts once it has passed.",
+        (),
+    ),
 )
 
 
