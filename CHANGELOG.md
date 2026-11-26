@@ -1,5 +1,7 @@
 # Changelog
 
+## 2026-11-26
+- Added rule A038 to flag Uniswap-style swaps that pass a literal 0 as the deadline. V2 routers and the V3 SwapRouter require `deadline >= block.timestamp`, so that swap always reverts. V3 params are checked both inline and when built before the call.
 ## 2026-11-25
 - Added rule A036 to flag Uniswap-style `getReserves` and `slot0` reads used as a spot price, which a flash loan can move in the same transaction.
 - Added rule A037 to flag `msg.value` inside a `for`/`while` loop, where one payment is credited on every iteration.
