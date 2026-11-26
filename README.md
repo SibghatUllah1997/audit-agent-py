@@ -116,6 +116,7 @@ Example output (real):
 /workspace/examples/Vulnerable.sol:320: A035 EIP-2612 permit() is called with deadline 0, which is already expired, so the call always reverts. Pass the deadline the owner signed.
 /workspace/examples/Vulnerable.sol:334: A036 AMM getReserves() is used as a spot price; a flash loan can move the pool in the same transaction. Use a TWAP or a dedicated oracle.
 /workspace/examples/Vulnerable.sol:346: A037 msg.value is read inside a loop, so one payment is counted on every iteration. Cache msg.value before the loop or split it with a per-item amount.
+/workspace/examples/Vulnerable.sol:364: A038 Uniswap-style swap passes deadline 0, which is already expired, so the router always reverts. Pass a real deadline the caller chose.
 ```
 
 Notes
