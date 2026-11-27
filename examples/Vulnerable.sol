@@ -382,3 +382,33 @@ contract VaultDeposit {
         credit[msg.sender] += received;
     }
 }
+
+// A same-transaction quote is the current price, not a slippage bound.
+interface IUniswapV2QuotedRouter {
+    function getAmountsOut(uint256 amountIn, address[] calldata path)
+        external
+        view
+        returns (uint256[] memory amounts);
+    function swapExactTokensForTokens(
+        uint256 amountIn,
+        uint256 amountOutMin,
+        address[] calldata path,
+        address to,
+        uint256 deadline
+    ) external returns (uint256[] memory amounts);
+}
+
+contract QuotedMinSwap {
+    IUniswapV2QuotedRouter public router;
+
+    function dump(uint256 amountIn, address[] calldata path, uint256 deadline) external {
+        // A040
+        router.swapExactTokensForTokens(
+            amountIn,
+            router.getAmountsOut(amountIn, path)[path.length - 1],
+            path,
+            msg.sender,
+            deadline
+        );
+    }
+}

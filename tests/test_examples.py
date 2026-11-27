@@ -219,3 +219,13 @@ def test_sample_contract_flags_balance_of_this_as_received() -> None:
     assert "balanceOf(address(this))" in pulls[0].line_text
     assert "donation" in pulls[0].message
     assert pulls[0].severity == "HIGH"
+
+
+def test_sample_contract_flags_quoted_min_swap() -> None:
+    findings = scan_paths([str(EXAMPLES)])
+    swaps = [f for f in findings if f.code == "A040"]
+    assert len(swaps) == 1
+    assert "swapExactTokensForTokens" in swaps[0].line_text
+    assert "amountOutMin" in swaps[0].message
+    assert swaps[0].severity == "HIGH"
+

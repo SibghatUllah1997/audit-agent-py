@@ -120,6 +120,7 @@ Example output (real):
 /workspace/examples/Vulnerable.sol:346: A037 msg.value is read inside a loop, so one payment is counted on every iteration. Cache msg.value before the loop or split it with a per-item amount.
 /workspace/examples/Vulnerable.sol:364: A038 Uniswap-style swap passes deadline 0, which is already expired, so the router always reverts. Pass a real deadline the caller chose.
 /workspace/examples/Vulnerable.sol:381: A039 balanceOf(address(this)) is used as the amount received after a transferFrom; a donation can inflate it. Use the pulled amount or the balance delta.
+/workspace/examples/Vulnerable.sol:406: A040 Uniswap-style swap uses a same-transaction getAmountsOut/quote as amountOutMin, so a sandwich can move the price and still clear the minimum. Apply slippage or take the minimum from the caller.
 ```
 
 Notes
