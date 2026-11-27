@@ -1602,6 +1602,86 @@ RULES: tuple[Rule, ...] = (
             """
         ),
     ),
+    Rule(
+        code="A040",
+        severity="HIGH",
+        title="Uniswap-style swap uses a same-transaction quote as `amountOutMin`",
+        rationale=(
+            "A `getAmountsOut`, `getAmountOut`, or quoter `quoteExactInput*` result is "
+            "the pool's current price. Passing that figure as `amountOutMin` / "
+            "`amountOutMinimum` in the same transaction is not slippage protection: a "
+            "sandwich can move the pool and the quote already matches the manipulated "
+            "price, so the swap still clears. Take the minimum from the caller, or "
+            "discount the quote (for example `quoted * 99 / 100`)."
+        ),
+        flagged=_sol(
+            """
+            interface IUniswapV2Router {
+                function getAmountsOut(uint256 amountIn, address[] calldata path)
+                    external
+                    view
+                    returns (uint256[] memory amounts);
+                function swapExactTokensForTokens(
+                    uint256 amountIn,
+                    uint256 amountOutMin,
+                    address[] calldata path,
+                    address to,
+                    uint256 deadline
+                ) external returns (uint256[] memory amounts);
+            }
+
+            contract Seller {
+                IUniswapV2Router public router;
+
+                function dump(
+                    uint256 amountIn,
+                    address[] calldata path,
+                    uint256 deadline
+                ) external {
+                    router.swapExactTokensForTokens(
+                        amountIn,
+                        router.getAmountsOut(amountIn, path)[path.length - 1],
+                        path,
+                        msg.sender,
+                        deadline
+                    );
+                }
+            }
+            """
+        ),
+        fixed=_sol(
+            """
+            interface IUniswapV2Router {
+                function getAmountsOut(uint256 amountIn, address[] calldata path)
+                    external
+                    view
+                    returns (uint256[] memory amounts);
+                function swapExactTokensForTokens(
+                    uint256 amountIn,
+                    uint256 amountOutMin,
+                    address[] calldata path,
+                    address to,
+                    uint256 deadline
+                ) external returns (uint256[] memory amounts);
+            }
+
+            contract Seller {
+                IUniswapV2Router public router;
+
+                function dump(
+                    uint256 amountIn,
+                    uint256 amountOutMin,
+                    address[] calldata path,
+                    uint256 deadline
+                ) external {
+                    router.swapExactTokensForTokens(
+                        amountIn, amountOutMin, path, msg.sender, deadline
+                    );
+                }
+            }
+            """
+        ),
+    ),
 )
 
 _BY_CODE = {rule.code: rule for rule in RULES}

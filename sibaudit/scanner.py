@@ -1321,6 +1321,134 @@ def _detect_zero_slippage_swap(
             )
 
 
+QUOTE_OUT_CALL_PATTERN = re.compile(
+    r"\.\s*(?P<method>getAmountsOut|getAmountOut|quoteExactInput(?:Single)?)"
+    r"\s*(?:\{[^}]*\})?\s*\(",
+    re.IGNORECASE,
+)
+
+
+def _end_of_call_and_indexes(text: str, open_paren: int) -> int | None:
+    """End offset after a ``(...)`` and any trailing ``[...]`` groups."""
+    end = _close_paren_end(text, open_paren)
+    if end is None:
+        return None
+    while True:
+        i = end
+        n = len(text)
+        while i < n and text[i] in " \t\n":
+            i += 1
+        if i >= n or text[i] != "[":
+            return end
+        depth = 0
+        closed = None
+        for j in range(i, n):
+            if text[j] == "[":
+                depth += 1
+            elif text[j] == "]":
+                depth -= 1
+                if depth == 0:
+                    closed = j + 1
+                    break
+        if closed is None:
+            return None
+        end = closed
+
+
+def _indexed_name_span(expr: str) -> tuple[str, int] | None:
+    """If ``expr`` starts with ``name[...]``, return the name and the end offset."""
+    match = re.match(r"^(?P<name>[A-Za-z_]\w*)\s*\[", expr)
+    if not match:
+        return None
+    depth = 0
+    for index, char in enumerate(expr[match.end() - 1 :], start=match.end() - 1):
+        if char == "[":
+            depth += 1
+        elif char == "]":
+            depth -= 1
+            if depth == 0:
+                return match.group("name"), index + 1
+    return None
+
+
+def _is_unadjusted_quote_expr(expr: str, quote_names: set[str] | None = None) -> bool:
+    """True if ``expr`` is a quote call (or alias) with no slippage math applied."""
+    expr = _unwrap_parens(expr.strip())
+    if not expr or _is_zero_amount(expr):
+        return False
+    names = quote_names or set()
+    for match in QUOTE_OUT_CALL_PATTERN.finditer(expr):
+        end = _end_of_call_and_indexes(expr, match.end() - 1)
+        if end is None:
+            continue
+        # The text before the call is the receiver (router, a cast, ...).
+        # Arithmetic on either side means a slippage adjustment is already applied.
+        before = expr[: match.start()].strip()
+        after = _unwrap_parens(expr[end:].strip())
+        if after == "" and not re.search(r"[*/+\-]", before):
+            return True
+    if SIMPLE_NAME_PATTERN.fullmatch(expr) and expr in names:
+        return True
+    indexed = _indexed_name_span(expr)
+    if indexed is not None:
+        name, end = indexed
+        if name in names and _unwrap_parens(expr[end:].strip()) == "":
+            return True
+    return False
+
+
+def _quote_out_names(source: str) -> set[str]:
+    """Locals assigned from an unadjusted ``getAmountsOut`` / quoter result."""
+    names: set[str] = set()
+    for match in NAME_ASSIGN_PATTERN.finditer(source):
+        if _is_unadjusted_quote_expr(match.group("value"), names):
+            names.add(match.group("name"))
+    return names
+
+
+def _detect_quoted_min_swap(
+    lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
+) -> Iterator[Finding]:
+    # A same-transaction getAmountsOut / quote used as amountOutMin already
+    # matches the current (manipulable) price, so it is not a slippage bound.
+    message = (
+        "Uniswap-style swap uses a same-transaction getAmountsOut/quote as "
+        "amountOutMin, so a sandwich can move the price and still clear the "
+        "minimum. Apply slippage or take the minimum from the caller."
+    )
+    for start_line, end_line in _callable_spans(lines):
+        source = _span_source(lines, start_line, end_line)
+        quote_names = _quote_out_names(source)
+        for match in SWAP_EXACT_PATTERN.finditer(source):
+            close_end = _close_paren_end(source, match.end() - 1)
+            if close_end is None:
+                continue
+            line_no = start_line + source[: match.start()].count("\n")
+            if ignore_next_lines and line_no in ignore_next_lines:
+                continue
+            args_text = source[match.end() : close_end - 1]
+            min_expr = None
+            field = AMOUNT_OUT_MIN_FIELD_PATTERN.search(args_text)
+            if field:
+                min_expr = field.group("value")
+            else:
+                index = _swap_min_out_index(match.group("method"))
+                if index is not None:
+                    args = _split_top_level_args(args_text)
+                    if len(args) > index:
+                        min_expr = args[index]
+            if min_expr is None or not _is_unadjusted_quote_expr(min_expr, quote_names):
+                continue
+            yield Finding(
+                file_path=file_path,
+                line_number=line_no,
+                code="A040",
+                severity="HIGH",
+                message=message,
+                line_text=lines[line_no - 1].rstrip(),
+            )
+
+
 PERMIT_CALL_PATTERN = re.compile(r"\.\s*permit\s*\(")
 # Argument count -> (position of the deadline, style). EIP-2612 is the
 # 7-arg (v, r, s) form; some tokens add a 5-arg overload with packed
@@ -3559,6 +3687,7 @@ _DETECTORS = (
     _detect_unchecked_latest_round,
     _detect_unchecked_latest_answer,
     _detect_zero_slippage_swap,
+    _detect_quoted_min_swap,
     _detect_zero_deadline_permit,
     _detect_amm_spot_oracle,
     _detect_msg_value_in_loop,

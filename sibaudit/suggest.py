@@ -332,6 +332,12 @@ _HINTS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
         "Credit the transfer amount, or snapshot balanceOf before the pull and subtract.",
         (),
     ),
+    (
+        "A040",
+        "Do not pass getAmountsOut or a quoter result as amountOutMin; take the "
+        "minimum from the caller or discount the quote.",
+        (),
+    ),
 )
 
 

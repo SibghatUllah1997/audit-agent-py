@@ -52,6 +52,7 @@ Rules
 | A037 | HIGH     | `msg.value` read inside a loop |
 | A038 | MEDIUM   | Uniswap-style swap with `deadline` of 0 |
 | A039 | HIGH     | `balanceOf(address(this))` used as the amount received after a transfer |
+| A040 | HIGH     | Uniswap-style swap uses a same-transaction quote as `amountOutMin` |
 
 Install
 - Python 3.11+
