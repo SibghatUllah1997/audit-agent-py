@@ -1322,10 +1322,61 @@ def _detect_zero_slippage_swap(
 
 
 QUOTE_OUT_CALL_PATTERN = re.compile(
-    r"\.\s*(?P<method>getAmountsOut|getAmountOut|quoteExactInput(?:Single)?)"
-    r"\s*(?:\{[^}]*\})?\s*\(",
+    r"\.\s*(?P<method>"
+    r"getAmounts(?:Out|In)"
+    r"|getAmount(?:Out|In)"
+    r"|quoteExact(?:Input|Output)(?:Single)?"
+    r"|quote"
+    r")\s*(?:\{[^}]*\})?\s*\(",
     re.IGNORECASE,
 )
+SWAP_EXACT_OUTPUT_PATTERN = re.compile(
+    r"\.\s*(?P<method>"
+    r"swapTokensForExactTokens"
+    r"|swapTokensForExactETH"
+    r"|exactOutputSingle"
+    r"|exactOutput"
+    r")\s*(?:\{[^}]*\})?\s*\(",
+    re.IGNORECASE,
+)
+AMOUNT_IN_MAX_FIELD_PATTERN = re.compile(
+    r"\bamountInMax(?:imum)?\s*:\s*(?P<value>[^,}\n]+)",
+    re.IGNORECASE,
+)
+
+
+def _swap_max_in_index(method: str) -> int | None:
+    """Positional index of ``amountInMax`` on Uniswap V2 ``swapTokensForExact*`` helpers."""
+    name = method.lower()
+    if name.startswith("swaptokensforexact"):
+        return 1
+    return None
+
+
+def _named_field_value(text: str, field: str) -> str | None:
+    """Return the value of a ``field: expr`` assignment, respecting nested commas."""
+    match = re.search(rf"\b{re.escape(field)}\s*:", text, re.IGNORECASE)
+    if not match:
+        return None
+    index = match.end()
+    n = len(text)
+    while index < n and text[index] in " \t\n":
+        index += 1
+    start = index
+    depth = 0
+    while index < n:
+        char = text[index]
+        if char in "([{":
+            depth += 1
+        elif char in ")]}":
+            if depth == 0:
+                break
+            depth -= 1
+        elif char in ",}" and depth == 0:
+            break
+        index += 1
+    value = text[start:index].strip()
+    return value or None
 
 
 def _end_of_call_and_indexes(text: str, open_paren: int) -> int | None:
@@ -1398,7 +1449,7 @@ def _is_unadjusted_quote_expr(expr: str, quote_names: set[str] | None = None) ->
 
 
 def _quote_out_names(source: str) -> set[str]:
-    """Locals assigned from an unadjusted ``getAmountsOut`` / quoter result."""
+    """Locals assigned from an unadjusted ``getAmounts*`` / quoter result."""
     names: set[str] = set()
     for match in NAME_ASSIGN_PATTERN.finditer(source):
         if _is_unadjusted_quote_expr(match.group("value"), names):
@@ -1406,45 +1457,121 @@ def _quote_out_names(source: str) -> set[str]:
     return names
 
 
+def _quoted_bound_from_swap_args(method: str, args_text: str) -> tuple[str, str] | None:
+    """Return ``(expr, kind)`` for a swap's amountOutMin or amountInMax, if present."""
+    name = method.lower()
+    if name.startswith("exactoutput"):
+        value = _named_field_value(args_text, "amountInMaximum") or _named_field_value(
+            args_text, "amountInMax"
+        )
+        return (value, "max") if value else None
+    if name.startswith("exactinput") or name.startswith("swapexact"):
+        value = (
+            _named_field_value(args_text, "amountOutMinimum")
+            or _named_field_value(args_text, "amountOutMin")
+        )
+        if value:
+            return value, "min"
+        index = _swap_min_out_index(method)
+        if index is not None:
+            args = _split_top_level_args(args_text)
+            if len(args) > index:
+                return args[index], "min"
+        return None
+    value = _named_field_value(args_text, "amountInMaximum") or _named_field_value(
+        args_text, "amountInMax"
+    )
+    if value:
+        return value, "max"
+    index = _swap_max_in_index(method)
+    if index is not None:
+        args = _split_top_level_args(args_text)
+        if len(args) > index:
+            return args[index], "max"
+    return None
+
+
+def _quoted_bound_from_params_literal(text: str) -> tuple[str, str] | None:
+    """Return the slippage bound on a V3 ``Exact*Params`` literal, if present."""
+    value = (
+        _named_field_value(text, "amountOutMinimum")
+        or _named_field_value(text, "amountOutMin")
+    )
+    if value:
+        return value, "min"
+    value = _named_field_value(text, "amountInMaximum") or _named_field_value(
+        text, "amountInMax"
+    )
+    if value:
+        return value, "max"
+    return None
+
+
 def _detect_quoted_min_swap(
     lines: list[str], file_path: Path, ignore_next_lines: set[int] | None = None
 ) -> Iterator[Finding]:
-    # A same-transaction getAmountsOut / quote used as amountOutMin already
+    # A same-transaction quote used as amountOutMin or amountInMax already
     # matches the current (manipulable) price, so it is not a slippage bound.
-    message = (
-        "Uniswap-style swap uses a same-transaction getAmountsOut/quote as "
-        "amountOutMin, so a sandwich can move the price and still clear the "
-        "minimum. Apply slippage or take the minimum from the caller."
-    )
+    messages = {
+        "min": (
+            "Uniswap-style swap uses a same-transaction getAmountsOut/quote as "
+            "amountOutMin, so a sandwich can move the price and still clear the "
+            "minimum. Apply slippage or take the minimum from the caller."
+        ),
+        "max": (
+            "Uniswap-style swap uses a same-transaction getAmountsIn/quote as "
+            "amountInMax, so a sandwich can move the price and still stay under "
+            "the max. Apply slippage or take the maximum from the caller."
+        ),
+    }
     for start_line, end_line in _callable_spans(lines):
         source = _span_source(lines, start_line, end_line)
         quote_names = _quote_out_names(source)
-        for match in SWAP_EXACT_PATTERN.finditer(source):
+        hits: dict[int, str] = {}
+        call_ranges: list[tuple[int, int]] = []
+        swap_calls = (
+            *SWAP_EXACT_PATTERN.finditer(source),
+            *SWAP_EXACT_OUTPUT_PATTERN.finditer(source),
+        )
+        for match in swap_calls:
             close_end = _close_paren_end(source, match.end() - 1)
             if close_end is None:
                 continue
-            line_no = start_line + source[: match.start()].count("\n")
-            if ignore_next_lines and line_no in ignore_next_lines:
+            bound = _quoted_bound_from_swap_args(
+                match.group("method"), source[match.end() : close_end - 1]
+            )
+            if bound is None:
                 continue
-            args_text = source[match.end() : close_end - 1]
-            min_expr = None
-            field = AMOUNT_OUT_MIN_FIELD_PATTERN.search(args_text)
-            if field:
-                min_expr = field.group("value")
-            else:
-                index = _swap_min_out_index(match.group("method"))
-                if index is not None:
-                    args = _split_top_level_args(args_text)
-                    if len(args) > index:
-                        min_expr = args[index]
-            if min_expr is None or not _is_unadjusted_quote_expr(min_expr, quote_names):
+            expr, kind = bound
+            if not _is_unadjusted_quote_expr(expr, quote_names):
+                continue
+            line_no = start_line + source[: match.start()].count("\n")
+            hits[line_no] = kind
+            call_ranges.append((match.start(), close_end))
+        for match in SWAP_PARAMS_LITERAL_PATTERN.finditer(source):
+            # An inline params literal is already reported on the router call.
+            if any(start <= match.start() < end for start, end in call_ranges):
+                continue
+            close_end = _close_paren_end(source, match.start("open"))
+            if close_end is None:
+                continue
+            bound = _quoted_bound_from_params_literal(source[match.end() : close_end])
+            if bound is None:
+                continue
+            expr, kind = bound
+            if not _is_unadjusted_quote_expr(expr, quote_names):
+                continue
+            line_no = start_line + source[: match.start()].count("\n")
+            hits.setdefault(line_no, kind)
+        for line_no in sorted(hits):
+            if ignore_next_lines and line_no in ignore_next_lines:
                 continue
             yield Finding(
                 file_path=file_path,
                 line_number=line_no,
                 code="A040",
                 severity="HIGH",
-                message=message,
+                message=messages[hits[line_no]],
                 line_text=lines[line_no - 1].rstrip(),
             )
 
